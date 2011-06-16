@@ -4,6 +4,21 @@ import time
 import socket 
 import string
 
+class MRFW:
+    @staticmethod
+    def is_type(thing, type):
+        try:
+            if thing.__class__.fancy_name == type:
+                return 1
+        except:
+            pass
+        return 0
+
+    @staticmethod
+    def is_player(thing):
+        return MRFW.is_type(thing, "player")
+
+
 class MRObject(object):
     fancy_name = "thing"
     cmds = {}
@@ -13,56 +28,87 @@ class MRObject(object):
 
 class MRRoom(MRObject):
     fancy_name = "room"
-    cmds = {"look":"cmd_look"}
+    cmds = {"say":"cmd_say"}
 
     def __init__(self, name):
         super(MRRoom,self).__init__(name)
         self.description = "A blank room."
         self.contents = []
 
-    def cmd_look(self, player, *args):
-        player.send(self.name + ": " + self.description)
-        if len(self.contents) == 0:
-            player.send("It is empty")
-        else:
-            player.send("Contents:")
-            for thing in self.contents:
-                player.send(" - " + thing.name)
+    def cmd_say(self, player, rest):
+        for thing in self.contents:
+            if MRFW.is_player(thing):
+                thing.send(player.name + " says: " + rest)
 
 
 class MRPlayer(MRObject):
     fancy_name = "player"
+    cmds = {"look":"cmd_look", "go":"cmd_go"}
 
     def __init__(self, name):
         super(MRPlayer,self).__init__(name)
-        self.client = []
-        self.room = []
+        self.client = None
+        self.room = None
+        self.description = "A non-descript citizen."
 
     def send(self, msg):
     	self.client.send(msg)
 
-    def handle_input(self, data):
-        words = data.split()
-        if words[0] == "go":
-            if len(words) < 2:
-                self.send("Go where?")
-                return 
-            found = db_search(words[1], "room")
-            if len(found) < 1:
-                self.send("Don't know this place. Is it in Canada?")
-            else:
-                if self.room != []:
-                    self.room.contents.remove(self)
-                self.room = found[0]
-                self.room.contents.append(self)
+    def cmd_go(self, player, rest):
+        words = rest.split()
+        if len(words) < 1:
+            self.send("Go where?")
+            return 
+        found = MRDB.search(words[0], "room")
+        if len(found) < 1:
+            self.send("Don't know this place. Is it in Canada?")
         else:
-            self.handle_local_cmd(data)
+            if self.room != None:
+                self.room.contents.remove(self)
+            self.room = found[0]
+            self.room.contents.append(self)
+
+    def cmd_look(self, player, rest):
+        what = None
+        if len(rest.split()) < 1:
+            what = "here"
+        else:
+            what = rest.split()[0]
+
+        if what == "here":
+            if self.room == None:
+                self.send("You only see nothing. A lot of nothing.")
+            else:
+                self.send(self.room.name + ": " + self.room.description)
+                if len(self.room.contents) == 0:
+                    self.send("It is empty")
+                else:
+                    self.send("Contents:")
+                for thing in self.room.contents:
+                    self.send(" - " + thing.name)
+        elif what == "me" or what==self.name:
+                self.send(self.name + ": " + self.description)
+        else:
+            if self.room == None:
+                self.send("You see nothing but you.")
+            else:
+                found = None
+                for thing in self.room.contents:
+                    if thing.name == what:
+                        self.send(thing.name + ": " + thing.description)
+                        found = 1
+                        break
+                if found == None:
+                    self.send("You see nothing like '" + what + "' here.")
+
+    def handle_input(self, data):
+        self.handle_local_cmd(data)
 
     def handle_local_cmd(self, data):
         words = data.split()
-        where2look = []
-        if self.room != []:
-            where2look = [self.room]
+        where2look = [self]
+        if self.room != None:
+            where2look.append(self.room)
 
         found = 0
         for p in where2look:
@@ -78,14 +124,15 @@ class MRDB:
     classes = [MRObject, MRRoom, MRPlayer]
     objects = []
 
-def db_search(name, type = "thing"):
-    found = []
-    for thing in MRDB.objects:
-        if thing.name == name:
-            if thing.__class__.fancy_name == type:
-                found.append(thing)
+    @staticmethod
+    def search(name, type = "thing"):
+        found = []
+        for thing in MRDB.objects:
+            if thing.name == name:
+                if thing.__class__.fancy_name == type:
+                    found.append(thing)
 
-    return found
+        return found
 
 
 class ClientRegister:    
@@ -155,7 +202,7 @@ class MRClient:
             if len(words) < 2:
                 self.send("Play who?")
                 return
-            found = db_search(words[1], "player")
+            found = MRDB.search(words[1], "player")
             if len(found) == 0:
                 self.send("Couldn't find the guy.")
             else:
