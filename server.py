@@ -208,9 +208,14 @@ class MRClient:
             else:
                 self.player = found[0]
                 found[0].client = self
-        elif words[0] == "exec":
+        elif words[0] == "eval":
             try:
                 self.send(str(eval(string.join(words[1:]))))
+            except Exception, pbm:
+                self.send(str(pbm))
+        elif words[0] == "exec":
+            try:
+                exec(string.join(words[1:]).replace('\\n','\n').replace('\\t','\t'))
             except Exception, pbm:
                 self.send(str(pbm))
         elif self.player != []:
