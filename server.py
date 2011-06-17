@@ -15,6 +15,14 @@ class MRFW:
         return False
 
     @staticmethod
+    def is_room(thing):
+        return MRFW.is_type(thing, "room")
+
+    @staticmethod
+    def is_thing(thing):
+        return MRFW.is_type(thing, "thing")
+
+    @staticmethod
     def is_player(thing):
         return MRFW.is_type(thing, "player")
 
@@ -23,6 +31,18 @@ class MRFW:
         if short == name[:len(short)]:
             return True
         return False
+
+    @staticmethod
+    def get_first_arg(data):
+        words = data.split()
+        if len(words) < 1:
+            raise EmptyArgException()
+        return words[0]
+
+    @staticmethod
+    def multiple_choice(choices):
+        names = map(lambda x:x.name, choices)
+        return "Which one?\nChoices are: " + string.join(names, ', ')
 
 
 class MRObject(object):
@@ -42,13 +62,20 @@ class MRRoom(MRObject):
         self.contents = []
 
     def cmd_say(self, player, rest):
+        self.broadcast(player.name + " says: " + rest)
+
+    def broadcast(self, msg):
         for thing in filter(MRFW.is_player, self.contents):
-            thing.send(player.name + " says: " + rest)
+            thing.send(msg)
+
 
 
 class MRPlayer(MRObject):
     fancy_name = "player"
-    cmds = {"look":"cmd_look", "go":"cmd_go"}
+    cmds = {"look":"cmd_look", 
+            "go":"cmd_go", 
+            'describe':'cmd_describe',
+            "destroy":"cmd_destroy"}
 
     def __init__(self, name):
         super(MRPlayer,self).__init__(name)
@@ -57,31 +84,84 @@ class MRPlayer(MRObject):
         self.description = "A non-descript citizen."
 
     def send(self, msg):
-    	self.client.send(msg)
+        if self.client != None:
+            self.client.send(msg)
+
+    def find_thing(self, name):
+        if name == "me" or name == self.name:
+            return self
+        if self.room == None:
+            raise NotFoundException()
+        if name == "here":
+            return self.room
+        match = filter(lambda x:MRFW.match_name(name, x.name), self.room.contents)
+        if len(match) > 1:
+            raise AmbiguousException(match)
+        if len(match) < 1:
+            return NotFoundException()
+        return match[0]
+
+    def cmd_describe(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+            thing = self.find_thing(what)
+        except AmbiguousException, ex:
+            self.send(MRFW.multiple_choice(ex.choices))
+        except NotFoundException:
+            self.send("You see nothing like '" + what + "' here.")
+        except EmptyArgException:
+            self.send("Describe what?")
+        else:
+            thing.description = string.join(rest.split()[1:])
 
     def cmd_go(self, player, rest):
-        words = rest.split()
-        if len(words) < 1:
+        try:
+            what = MRFW.get_first_arg(rest)
+        except EmptyArgException:
             self.send("Go where?")
-            return 
-        found = MRDB.search(words[0], MRRoom)
+            return
+        found = MRDB.search(what, MRRoom)
         if len(found) < 1:
             self.send("Don't know this place. Is it in Canada?")
         elif len(found) > 1:
-            self.send("Which one?")
+            self.send(MRFW.multiple_choice(found))
         else:
             if self.room != None:
                 self.room.contents.remove(self)
             self.room = found[0]
             self.room.contents.append(self)
 
-    def cmd_look(self, player, rest):
-        what = None
-        if len(rest.split()) < 1:
-            what = "here"
+    def cmd_destroy(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+            thing = self.find_thing(what)
+        except AmbiguousException, ex:
+            self.send(MRFW.multiple_choice(ex.choices))
+        except NotFoundException:
+            self.send("You see nothing like '" + what + "' here.")
+        except EmptyArgException:
+            self.send("Destroy what?")
         else:
-            what = rest.split()[0]
+            if self.room != None:
+                self.room.broadcast(self.name + " violently destroyed " + thing.name + "!")
+                if MRFW.is_room(thing):
+                    self.room.broadcast("You are expulsed into the void of nothingness.")
+                    for p in filter(MRFW.is_player, thing.contents):
+                        p.room = None
+                else:
+                    self.room.contents.remove(thing)
+            MRDB.objects.remove(thing)
+            if MRFW.is_player(thing):
+                if thing.client != None:
+                    thing.client.player = None
+                    thing.send("Your player has been slain. You were kicked out of it")
 
+
+    def cmd_look(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+        except EmptyArgException:
+            what = "here"
         if what == "here":
             if self.room == None:
                 self.send("You only see nothing. A lot of nothing.")
@@ -99,13 +179,14 @@ class MRPlayer(MRObject):
             if self.room == None:
                 self.send("You see nothing but you.")
             else:
-                match = filter(lambda x:MRFW.match_name(what, x.name), self.room.contents)
-                if len(match) > 1:
-                    self.send("Which one?")
-                elif len(match) < 1:
+                try:
+                    thing = self.find_thing(what)
+                except AmbiguousException, ex:
+                    self.send(MRFW.multiple_choice(ex))
+                except NotFoundException:
                     self.send("You see nothing like '" + what + "' here.")
                 else:
-                    self.send(match[0].name + ": " + match[0].description)
+                    self.send(thing.name + ": " + thing.description)
 
 
 class MRDB:
@@ -152,6 +233,15 @@ class ClientRegister:
         del self.idmap[client.id]
         self.clients.remove(client)
 
+class AmbiguousException(Exception):
+    def __init__(self, choices):
+        self.choices = choices
+
+class NotFoundException(Exception):
+    pass
+
+class EmptyArgException(Exception):
+    pass
 
 class MRClient:
     cmds = {'chat':'cmd_chat', 
@@ -201,18 +291,24 @@ class MRClient:
         else:
             thing = cls[0](words[1])
             MRDB.objects.append(thing)
+            if MRFW.is_thing(thing) and self.player != None:
+                if self.player.room != None:
+                    self.player.room.contents.append(thing)
 
     def cmd_play(self, rest):
-        words = rest.split()
-        if len(words) < 1:
+        try:
+            who = MRFW.get_first_arg(rest)
+        except EmptyArgException:
             self.send("Play who?")
             return
-        found = MRDB.search(words[0], MRPlayer)
+        found = MRDB.search(who, MRPlayer)
         if len(found) < 1:
             self.send("Couldn't find the guy.")
         elif len(found) > 1:
-            self.send("Could you be a bit more precise?")
+            self.send(MRFW.multiple_choice(found))
         else:
+            if self.player != None:
+                self.player.client = None
             self.player = found[0]
             found[0].client = self
 
@@ -249,7 +345,7 @@ class MRClient:
         else:
             t = cmds[match[0]]
             cmd = getattr(t, t.cmds[match[0]])
-            cmd(t, ''.join(words[1:]))
+            cmd(self.player, string.join(words[1:]))
 
     def is_op(self):
         return self.op
@@ -259,6 +355,10 @@ class MRClient:
             self.handler.request.send(msg + "\n")
         except:
             print "Could not send to " + self.name
+
+    def on_disconnect(self):
+        if self.player != None:
+            self.player.client = None
 
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
@@ -279,6 +379,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             data = self.rfile.readline()
             if len(data) < 1:
                 print("Client disconnected: " + ip)
+                self.cl.on_disconnect()
                 self.server.cr.delete(self.cl)
                 if not self.silent:
                     self.server.cr.broadcast(self.cl.name + " has quit")
