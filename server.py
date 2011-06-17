@@ -9,14 +9,20 @@ class MRFW:
     def is_type(thing, type):
         try:
             if thing.__class__.fancy_name == type:
-                return 1
+                return True
         except:
             pass
-        return 0
+        return False
 
     @staticmethod
     def is_player(thing):
         return MRFW.is_type(thing, "player")
+
+    @staticmethod
+    def match_name(short, name):
+        if short == name[:len(short)]:
+            return True
+        return False
 
 
 class MRObject(object):
@@ -36,9 +42,8 @@ class MRRoom(MRObject):
         self.contents = []
 
     def cmd_say(self, player, rest):
-        for thing in self.contents:
-            if MRFW.is_player(thing):
-                thing.send(player.name + " says: " + rest)
+        for thing in filter(MRFW.is_player, self.contents):
+            thing.send(player.name + " says: " + rest)
 
 
 class MRPlayer(MRObject):
@@ -59,9 +64,11 @@ class MRPlayer(MRObject):
         if len(words) < 1:
             self.send("Go where?")
             return 
-        found = MRDB.search(words[0], "room")
+        found = MRDB.search(words[0], MRRoom)
         if len(found) < 1:
             self.send("Don't know this place. Is it in Canada?")
+        elif len(found) > 1:
+            self.send("Which one?")
         else:
             if self.room != None:
                 self.room.contents.remove(self)
@@ -92,32 +99,13 @@ class MRPlayer(MRObject):
             if self.room == None:
                 self.send("You see nothing but you.")
             else:
-                found = None
-                for thing in self.room.contents:
-                    if thing.name == what:
-                        self.send(thing.name + ": " + thing.description)
-                        found = 1
-                        break
-                if found == None:
+                match = filter(lambda x:MRFW.match_name(what, x.name), self.room.contents)
+                if len(match) > 1:
+                    self.send("Which one?")
+                elif len(match) < 1:
                     self.send("You see nothing like '" + what + "' here.")
-
-    def handle_input(self, data):
-        self.handle_local_cmd(data)
-
-    def handle_local_cmd(self, data):
-        words = data.split()
-        where2look = [self]
-        if self.room != None:
-            where2look.append(self.room)
-
-        found = 0
-        for p in where2look:
-            if words[0] in p.cmds:
-                cmd = getattr(p, p.cmds[words[0]])
-                cmd(self, string.join(words[1:]))
-                found = 1
-        if found == 0:
-            self.send("Huh?")
+                else:
+                    self.send(match[0].name + ": " + match[0].description)
 
 
 class MRDB:
@@ -125,14 +113,18 @@ class MRDB:
     objects = []
 
     @staticmethod
-    def search(name, type = "thing"):
+    def search(name, type = MRObject):
         found = []
         for thing in MRDB.objects:
-            if thing.name == name:
-                if thing.__class__.fancy_name == type:
+            if MRFW.match_name(name, thing.name):
+                if isinstance(thing, type):
                     found.append(thing)
-
         return found
+
+    @staticmethod
+    def list_all(type):
+        return MRDB.search(None, type)
+
 
 
 class ClientRegister:    
@@ -162,66 +154,102 @@ class ClientRegister:
 
 
 class MRClient:
+    cmds = {'chat':'cmd_chat', 
+            'name':'cmd_name',
+            'help':'cmd_help',
+            'create':'cmd_create',
+            'play':'cmd_play',
+            'eval':'cmd_eval',
+            'exec':'cmd_exec'}
+          
     def __init__(self, handler, name):
         self.handler = handler
         self.name = name
         self.op = 0
         handler.server.cr.broadcast(name + " connected!")
         self.id = handler.server.cr.get_uid()
-        self.player = []
+        self.player = None
+
+    def cmd_chat(self, rest):
+        self.handler.server.cr.broadcast("[global] " + self.name + 
+                " says: " + rest)
+
+    def cmd_name(self, rest):
+        words = rest.split()
+        if len(words) < 1:
+            self.send("Again?")
+        else:
+            self.name = words[0]
+
+    def cmd_help(self, rest):
+        self.send("chat <text>           global chat\n"
+                  "name <name>           change your client name\n"
+                  "exec <command>        execute python command\n"
+                  "create <type> <name>  thing, player, or room\n"
+                  "play <name>           go in the shoes of a player\n"
+                  "go <place>            move to a room\n"
+                  "look                  in a room, look around")
+
+    def cmd_create(self, rest):
+        words = rest.split()
+        if len(words) < 2:
+            self.send("Cannot create a nameless thing...")
+            return
+        cls = filter(lambda x:MRFW.match_name(words[0], x.fancy_name), MRDB.classes)
+        if len(cls) != 1:
+            self.send("Create a what?")
+        else:
+            thing = cls[0](words[1])
+            MRDB.objects.append(thing)
+
+    def cmd_play(self, rest):
+        words = rest.split()
+        if len(words) < 1:
+            self.send("Play who?")
+            return
+        found = MRDB.search(words[0], MRPlayer)
+        if len(found) < 1:
+            self.send("Couldn't find the guy.")
+        elif len(found) > 1:
+            self.send("Could you be a bit more precise?")
+        else:
+            self.player = found[0]
+            found[0].client = self
+
+    def cmd_eval(self, rest):
+        try:
+            self.send(str(eval(rest)))
+        except Exception, pbm:
+            self.send(str(pbm))
+
+    def cmd_exec(self, rest):
+        try:
+            exec(rest.replace('\\n','\n').replace('\\t','\t'))
+        except Exception, pbm:
+            self.send(str(pbm))
 
     def handle_input(self, data):
+        cmds = {}
+        for k in self.cmds.keys():
+            cmds[k] = self
+        if self.player != None:
+            for k in self.player.cmds.keys():
+                cmds[k] = self.player
+            if self.player.room != None:
+                for k in self.player.room.cmds.keys():
+                    cmds[k] = self.player.room
         words = data.split()
-        if words[0] == "chat":
-                self.handler.server.cr.broadcast("[global] " + self.name + 
-                        " says: " + string.join(words[1:]))
-        elif words[0] == "name":
-            self.name = words[1]
-        elif words[0] == "help":
-            self.send("chat <text>           global chat\n"
-                      "name <name>           change your client name\n"
-                      "exec <command>        execute python command\n"
-                      "create <type> <name>  thing, player, or room\n"
-                      "play <name>           go in the shoes of a player\n"
-                      "go <place>            move to a room\n"
-                      "look                  in a room, look around")
-        elif words[0] == "create":
-            if len(words) < 3:
-                self.send("Cannot create a nameless thing...")
-                return
-            found = 0
-            for cl in MRDB.classes:
-                if words[1] == cl.fancy_name:
-                    thing = cl(words[2])
-                    MRDB.objects.append(thing)
-                    found = 1
-                    break
-            if found == 0:
-                self.send("Don't know what a '" + words[1] + "' is...")
-        elif words[0] == "play":
-            if len(words) < 2:
-                self.send("Play who?")
-                return
-            found = MRDB.search(words[1], "player")
-            if len(found) == 0:
-                self.send("Couldn't find the guy.")
-            else:
-                self.player = found[0]
-                found[0].client = self
-        elif words[0] == "eval":
-            try:
-                self.send(str(eval(string.join(words[1:]))))
-            except Exception, pbm:
-                self.send(str(pbm))
-        elif words[0] == "exec":
-            try:
-                exec(string.join(words[1:]).replace('\\n','\n').replace('\\t','\t'))
-            except Exception, pbm:
-                self.send(str(pbm))
-        elif self.player != []:
-            self.player.handle_input(data)
-        else:
+        match = filter(lambda x:MRFW.match_name(words[0], x), cmds.keys())
+        if len(match) != 1:
             self.send("Huh?")
+            return
+        if cmds[match[0]] == self:
+            cmd = getattr(self, self.cmds[match[0]])
+            cmd(string.join(words[1:]))
+        else:
+            t = cmds[match[0]]
+            cmd = getattr(t, t.cmds[match[0]])
+            cmd(t, ''.join(words[1:]))
 
     def is_op(self):
         return self.op
