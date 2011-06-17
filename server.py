@@ -204,7 +204,7 @@ class MRDB:
 
     @staticmethod
     def list_all(type):
-        return MRDB.search(None, type)
+        return MRDB.search("", type)
 
 
 
