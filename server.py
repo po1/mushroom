@@ -89,6 +89,7 @@ class MRPlayer(MRObject):
         return odict
 
     def __setstate__(self, dict):
+        self.__dict__.update(dict)
         self.client = None
 
     def send(self, msg):
