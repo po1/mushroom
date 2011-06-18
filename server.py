@@ -136,6 +136,8 @@ class MRPlayer(MRObject):
         else:
             if self.room != None:
                 self.room.contents.remove(self)
+                self.room.broadcast(self.name + ' has gone to ' found[0].name) 
+            found[0].broadcast(self.name + ' arrives from ' self.room.name) 
             self.room = found[0]
             self.room.contents.append(self)
 
