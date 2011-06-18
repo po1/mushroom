@@ -289,6 +289,9 @@ class MRClient:
         if len(cls) != 1:
             self.send("Create a what?")
         else:
+            if len(MRDB.search(words[1])) > 0:
+                self.send("Uhm... something by that name already exists...")
+                return
             thing = cls[0](words[1])
             MRDB.objects.append(thing)
             if MRFW.is_thing(thing) and self.player != None:
