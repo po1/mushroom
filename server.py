@@ -3,6 +3,7 @@ import SocketServer
 import time
 import socket 
 import string
+import pickle
 
 class MRFW:
     @staticmethod
@@ -386,7 +387,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         ip = self.request.getpeername()[0]
         self.cl = MRClient(self, ip)
         self.server.cr.add(self.cl)
-        self.silent = 0
+        self.silent = False
 
         print("New client: " + ip)
         while True:
@@ -402,8 +403,13 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             words = data.split()
             if len(words) < 1:
                 continue
-            if self.handle_scommands(words) < 1:
-                self.cl.handle_input(data);
+            try:
+                if self.handle_scommands(words) < 1:
+                    self.cl.handle_input(data);
+            except Exception, e:
+                print e
+                self.request.send("An error occured. Please reconnect...\n")
+                self.request.rfile.close()
 
     def handle_scommands(self, words):
         if len(words) < 1:
@@ -427,8 +433,21 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             elif cmd == "users":
                 if self.cl.is_op():
                     for c in self.server.cr.clients:
-                        self.request.send(`c.id` + "\t" + c.name + "\t" 
+                        try:
+                            self.request.send(`c.id` + "\t" + c.name + "\t" 
                                 + c.handler.request.getpeername()[0] + "\n")
+                        except:
+                            self.request.send(`c.id` + "\t" + c.name + "\t" 
+                                + "SOCK_ERR\n")
+
+                    return 1
+            elif cmd == "save":
+                if self.cl.is_op():
+                    pickle.dump(MRDB.objects, open('world.sav', 'wb'))
+                    return 1
+            elif cmd == "load":
+                if self.cl.is_op():
+                    MRDB.objects = pickle.load(open('world.sav', 'rb'))
                     return 1
             elif cmd == "kick":
                 if self.cl.is_op():
@@ -441,7 +460,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                             clnt = self.server.cr.idmap[id]
                             req = clnt.handler.request
                             req.send("You have been kicked! (ouch...)\n")
-                            clnt.handler.silent = 1
+                            clnt.handler.silent = True
                             clnt.handler.request.shutdown(socket.SHUT_RDWR)
                             self.server.cr.broadcast_except(clnt, clnt.name + 
                             	" has been kicked!")
