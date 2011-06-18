@@ -367,7 +367,7 @@ class MRClient:
 
     def send(self, msg):
         try:
-            self.handler.request.send(msg + "\n")
+            self.handler.wfile.write(msg + "\n")
         except:
             print "Could not send to " + self.name
 
@@ -382,6 +382,14 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     """
     scommand_letter = '@'
     sc_password = 'lol'
+    
+    scmds = {'help':'scmd_help',
+             'login':'scmd_login',
+             'users':'scmd_users',
+             'kick':'scmd_kick',
+             'save':'scmd_save',
+             'load':'scmd_load'}
+    op_scmds = ['users', 'kick', 'save', 'load']
 
     def handle(self):
         ip = self.request.getpeername()[0]
@@ -390,87 +398,91 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.silent = False
 
         print("New client: " + ip)
-        while True:
-            data = self.rfile.readline()
-            if len(data) < 1:
-                print("Client disconnected: " + ip)
-                self.cl.on_disconnect()
-                self.server.cr.delete(self.cl)
-                if not self.silent:
-                    self.server.cr.broadcast(self.cl.name + " has quit")
-                break
-            data = data.strip() 
-            words = data.split()
-            if len(words) < 1:
-                continue
+        self.wfile.write("Welcome!\n")
+        for data in self.rfile:
             try:
-                if self.handle_scommands(words) < 1:
+                if not self.handle_scommands(data):
                     self.cl.handle_input(data);
             except Exception, e:
                 print e
-                self.request.send("An error occured. Please reconnect...\n")
-                self.request.rfile.close()
+                self.wfile.write("An error occured. Please reconnect...\n")
+                break
+        print("Client disconnected: " + ip)
+        self.cl.on_disconnect()
+        self.server.cr.delete(self.cl)
+        if not self.silent:
+            self.server.cr.broadcast(self.cl.name + " has quit")
 
-    def handle_scommands(self, words):
+    def handle_scommands(self, data):
+        words = data.split()
         if len(words) < 1:
-            return 0
+            return True # no need to parse that further
+        if words[0][0] != self.scommand_letter:
+            return False
+        cmd = words[0].lstrip('@') 
+        if cmd not in self.scmds:
+            return False
+        if cmd in self.op_scmds and not self.cl.is_op():
+            return False
+        return getattr(self, self.scmds[cmd])(string.join(words[1:]))
 
-        if words[0][0] == self.scommand_letter:
-            cmd = words[0].lstrip('@') 
-            if cmd == "help":
-                self.request.send("No help for now\n")
-                return 1
-            elif cmd == "login":
-                if len(words) > 1:
-                    if words[1] == self.sc_password:
-                        self.cl.op = 1
-                        return 1
-            elif cmd == "shutdown":
-                if self.cl.is_op():
-                    print("Shutdown request by " + self.cl.name)
-                    self.server.running = 0
-                    return 1
-            elif cmd == "users":
-                if self.cl.is_op():
-                    for c in self.server.cr.clients:
-                        try:
-                            self.request.send(`c.id` + "\t" + c.name + "\t" 
-                                + c.handler.request.getpeername()[0] + "\n")
-                        except:
-                            self.request.send(`c.id` + "\t" + c.name + "\t" 
-                                + "SOCK_ERR\n")
+    def scmd_help(self, rest):
+        self.wfile.write("No help for now\n")
+        return True
 
-                    return 1
-            elif cmd == "save":
-                if self.cl.is_op():
-                    pickle.dump(MRDB.objects, open('world.sav', 'wb'))
-                    return 1
-            elif cmd == "load":
-                if self.cl.is_op():
-                    MRDB.objects = pickle.load(open('world.sav', 'rb'))
-                    return 1
-            elif cmd == "kick":
-                if self.cl.is_op():
-                    try:
-                        id = int(words[1])
-                    except ValueError:
-                        self.request.send("Error: not a valid id\n")
-                    else:
-                        if id in self.server.cr.idmap:
-                            clnt = self.server.cr.idmap[id]
-                            req = clnt.handler.request
-                            req.send("You have been kicked! (ouch...)\n")
-                            clnt.handler.silent = True
-                            clnt.handler.request.shutdown(socket.SHUT_RDWR)
-                            self.server.cr.broadcast_except(clnt, clnt.name + 
-                            	" has been kicked!")
-                        else:
-                            self.request.send("Error: not a valid id\n")
-                    return 1
-        return 0
+    def scmd_login(self, rest):
+        if rest == self.sc_password:
+            self.cl.op = True
+            return True
+        return False
+
+    def scmd_shutdown(self, rest):
+        print("Shutdown request by " + self.cl.name)
+        self.server.running = False
+        return True
+
+    def scmd_users(self, rest):
+        for c in self.server.cr.clients:
+            try:
+                self.wfile.write(`c.id` + "\t" + c.name + "\t" 
+                    + c.handler.request.getpeername()[0] + "\n")
+            except:
+                self.wfile.write(`c.id` + "\t" + c.name + "\t" 
+                    + "SOCK_ERR\n")
+        return True
+
+    def scmd_save(self, rest):
+        pickle.dump(MRDB.objects, open('world.sav', 'wb'))
+        return True
+
+    def scmd_load(self, rest):
+        try:
+            MRDB.objects = pickle.load(open('world.sav', 'rb'))
+        except Exception, e:
+            self.wfile.write("Load failed. Check server log.\n")
+            print e
+        return True
+
+    def scmd_kick(self, rest):
+        try:
+            id = int(rest)
+        except ValueError:
+            self.wfile.write("Error: not a valid id\n")
+        else:
+            if id in self.server.cr.idmap:
+                clnt = self.server.cr.idmap[id]
+                req = clnt.handler.wfile
+                req.write("You have been kicked! (ouch...)\n")
+                clnt.handler.silent = True
+                clnt.handler.request.shutdown(socket.SHUT_RD)
+                self.server.cr.broadcast_except(clnt, clnt.name + 
+                    " has been kicked!")
+            else:
+                self.wfile.write("Error: not a valid id\n")
+        return True
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    pass
+    allow_reuse_address = True
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 1337
@@ -482,7 +494,7 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=server.serve_forever)
     # Exit the server thread when the main thread terminates
     server_thread.setDaemon(True)
-    server.running = 1
+    server.running = True
     server.cr = ClientRegister()
     server_thread.start()
 
@@ -497,3 +509,6 @@ if __name__ == "__main__":
             break
 
     server.cr.broadcast("Shutting down...")
+#     for c in server.cr.clients:
+#         c.handler.request.shutdown(socket.SHUT_RD)
+#     server.server_close()
