@@ -83,6 +83,14 @@ class MRPlayer(MRObject):
         self.room = None
         self.description = "A non-descript citizen."
 
+    def __getstate__(self):
+        odict = self.__dict__.copy()
+        del odict['client']
+        return odict
+
+    def __setstate__(self, dict):
+        self.client = None
+
     def send(self, msg):
         if self.client != None:
             self.client.send(msg)
@@ -98,7 +106,7 @@ class MRPlayer(MRObject):
         if len(match) > 1:
             raise AmbiguousException(match)
         if len(match) < 1:
-            return NotFoundException()
+            raise NotFoundException()
         return match[0]
 
     def cmd_describe(self, player, rest):
@@ -128,6 +136,8 @@ class MRPlayer(MRObject):
         else:
             if self.room != None:
                 self.room.contents.remove(self)
+                self.room.broadcast(self.name + ' has gone to ' found[0].name) 
+            found[0].broadcast(self.name + ' arrives from ' self.room.name) 
             self.room = found[0]
             self.room.contents.append(self)
 
