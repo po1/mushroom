@@ -390,8 +390,9 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
              'users':'scmd_users',
              'kick':'scmd_kick',
              'save':'scmd_save',
+             'shutdown':'scmd_shutdown',
              'load':'scmd_load'}
-    op_scmds = ['users', 'kick', 'save', 'load']
+    op_scmds = ['users', 'kick', 'save', 'load', 'shutdown']
 
     def handle(self):
         ip = self.request.getpeername()[0]
