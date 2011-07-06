@@ -1,1 +1,9 @@
-all
+ - a save system which permits recovering to any previous working state
+ - some barriers, especially to direct code execution
+ - extension of the fw:
+   . room interconnection
+   . power players "architects"
+   . a bunch of utility methods (oemit, aemit...)
+ - mechanism to save added functions
+ - think about stacking different layers of commands (power user, global, specific...)
+ - automation: separate thread that performs registered actions at regular intervals
