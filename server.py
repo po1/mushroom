@@ -5,7 +5,7 @@ import socket
 import string
 import pickle
 
-import config
+from config import MRConfig as cfg
 import fw
 
 class ClientRegister:
@@ -46,8 +46,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     Also handles the operator commands,
     which are FW-independant
     """
-    scommand_letter = config.MRConfig.op_command_prefix
-    sc_password = config.MRConfig.op_password
+    scommand_letter = cfg.op_command_prefix
+    sc_password = cfg.op_password
     
     scmds = {'help':'scmd_help',
              'login':'scmd_login',
@@ -59,7 +59,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     op_scmds = ['users', 'kick', 'save', 'load', 'shutdown']
 
     def handle(self):
-        client_class = fw.__dict__[config.MRConfig.client_class]
+        client_class = fw.__dict__[cfg.client_class]
 
         ip = self.request.getpeername()[0]
         self.cl = client_class(self, ip)
@@ -83,7 +83,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             self.server.cr.broadcast(self.cl.name + " has quit")
 
     def handle_scommands(self, data):
-        op_command_prefix = config.MRConfig.op_command_prefix
+        op_command_prefix = cfg.op_command_prefix
         words = data.split()
         if len(words) < 1:
             return True # no need to parse that further
@@ -101,8 +101,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return True
 
     def scmd_login(self, rest):
-        op_password = config.MRConfig.op_password
-        if rest == op_password:
+        if rest == cfg.op_password:
             self.cl.op = True
             return True
         return False
@@ -123,18 +122,16 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return True
 
     def scmd_save(self, rest):
-        db_class = fw.__dict__[config.MRConfig.db_class]
-        db_file = config.MRConfig.db_file
+        db_class = fw.__dict__[cfg.db_class]
 
-        pickle.dump(db_class.objects, open(db_file, 'wb'))
+        pickle.dump(db_class.objects, open(cfg.db_file, 'wb'))
         return True
 
     def scmd_load(self, rest):
-        db_class = fw.__dict__[config.MRConfig.db_class]
-        db_file = config.MRConfig.db_file
+        db_class = fw.__dict__[cfg.db_class]
 
         try:
-            db_class.objects = pickle.load(open(db_file, 'rb'))
+            db_class.objects = pickle.load(open(cfg.db_file, 'rb'))
         except Exception, e:
             self.wfile.write("Load failed. Check server log.\n")
             print e
@@ -163,7 +160,7 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     allow_reuse_address = True
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 1337
+    HOST, PORT = cfg.listen_address, cfg.listen_port
 
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
 
