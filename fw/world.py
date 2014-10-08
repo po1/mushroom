@@ -65,6 +65,11 @@ class MRRoom(MRObject):
 
 
 class MRPlayer(MRObject):
+    """
+    Basic Player.
+    Other player classes derive from this
+    """
+
     fancy_name = "player"
     cmds = {"look":"cmd_look",
             "go":"cmd_go",
@@ -76,6 +81,7 @@ class MRPlayer(MRObject):
         self.description = "A non-descript citizen."
         self.client = None
         self.room = None
+        self.powers = []
 
     def __getstate__(self):
         odict = self.__dict__.copy()
@@ -199,3 +205,50 @@ class MRPlayer(MRObject):
                 else:
                     self.send(thing.name + ": " + thing.description)
 
+
+class MRPower(object):
+    cmds = {}
+
+    @classmethod
+    def cmdlist(cls):
+        a = cls.cmds
+        for c in cls.__bases__:
+            if issubclass(c, MRPower) and c is not MRPower:
+                a.update(c.cmdlist())
+        return a
+
+
+class MRArchi(MRPower):
+    """
+    Architect class
+    Has extended powers
+    """
+
+    cmds = {'eval':'cmd_eval',
+            'exec':'cmd_exec'}
+
+    def __init__(self, client):
+        self.client = client
+
+    def _safe_env(self):
+        cl = self.client
+        locd = {
+            'client': cl,
+            'me': cl.player,
+            'here': cl.player.room if cl.player is not None else None,
+        }
+        return globals(), locd
+
+    def cmd_eval(self, rest):
+        try:
+            genv, lenv = self._safe_env()
+            self.send(str(eval(rest, genv, lenv)))
+        except Exception, pbm:
+            self.send(str(pbm))
+
+    def cmd_exec(self, rest):
+        try:
+            genv, lenv = self._safe_env()
+            exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
+        except Exception, pbm:
+            self.send(str(pbm))

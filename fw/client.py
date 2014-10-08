@@ -38,8 +38,7 @@ class MRClient(BaseClient):
             'help':'cmd_help',
             'create':'cmd_create',
             'play':'cmd_play',
-            'eval':'cmd_eval',
-            'exec':'cmd_exec'}
+    }
 
 
     def __init__(self, handler, name):
@@ -102,28 +101,6 @@ class MRClient(BaseClient):
             self.player = found[0]
             found[0].client = self
 
-    def _safe_env(self):
-        locd = {
-            'client': self,
-            'me': self.player,
-            'here': self.player.room if self.player is not None else None,
-        }
-        return globals(), locd
-
-    def cmd_eval(self, rest):
-        try:
-            genv, lenv = self._safe_env()
-            self.send(str(eval(rest, genv, lenv)))
-        except Exception, pbm:
-            self.send(str(pbm))
-
-    def cmd_exec(self, rest):
-        try:
-            genv, lenv = self._safe_env()
-            exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
-        except Exception, pbm:
-            self.send(str(pbm))
-
     def handle_input(self, data):
         """
         Basic handler for commands
@@ -144,6 +121,9 @@ class MRClient(BaseClient):
         if self.player is not None:
             for k, c in self.player.cmds.items():
                 cmds[k] = getattr(self.player, c)
+            for p in self.player.powers:
+                for k, c in p.cmdlist().items():
+                    cmds[k] = getattr(p, c).im_func
             if self.player.room is not None:
                 for k, c in self.player.room.cmds.items():
                     cmds[k] = getattr(self.player.room, c)
