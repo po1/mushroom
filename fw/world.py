@@ -71,19 +71,29 @@ class MRRoom(MRObject):
     """
 
     fancy_name = "room"
-    cmds = {"say":"cmd_say"}
+    cmds = {"say":"cmd_say",
+            "emit":"cmd_emit",
+    }
 
     def __init__(self, name):
         super(MRRoom, self).__init__(name)
         self.contents = []
         self.description = "A blank room."
 
-    def cmd_say(self, player, rest):
-        self.broadcast(player.name + " says: " + rest)
-
-    def broadcast(self, msg):
+    def emit(self, msg):
         for thing in filter(MRFW.is_player, self.contents):
             thing.send(msg)
+
+    def oemit(self, player, emit):
+        for pl in filter(MRFW.is_player, self.contents):
+            if pl != player:
+                pl.send(msg)
+
+    def cmd_say(self, player, rest):
+        self.emit(player.name + " says: " + rest)
+
+    def cmd_emit(self, player, rest):
+        self.emit(rest.replace('\\n','\n').replace('\\t','\t'))
 
 
 class MRPlayer(MRObject):
@@ -185,12 +195,13 @@ class MRPlayer(MRObject):
         else:
             if self.room is not None:
                 self.room.contents.remove(self)
-                self.room.broadcast(self.name + ' has gone to ' + found[0].name)
-                found[0].broadcast(self.name + ' arrives from ' + self.room.name)
+                self.room.emit(self.name + ' has gone to ' + found[0].name)
+                found[0].emit(self.name + ' arrives from ' + self.room.name)
             else:
-                found[0].broadcast(self.name + ' pops into the room')
+                found[0].emit(self.name + ' pops into the room')
             self.room = found[0]
             self.room.contents.append(self)
+            self.cmd_look(self, "here")
 
     def cmd_destroy(self, player, rest):
         from .db import MRDB
@@ -206,9 +217,9 @@ class MRPlayer(MRObject):
             self.send("Destroy what?")
         else:
             if self.room is not None:
-                self.room.broadcast(self.name + " violently destroyed " + thing.name + "!")
+                self.room.emit(self.name + " violently destroyed " + thing.name + "!")
                 if MRFW.is_room(thing):
-                    self.room.broadcast("You are expulsed into the void of nothingness.")
+                    self.room.emit("You are expulsed into the void of nothingness.")
                     for p in filter(MRFW.is_player, thing.contents):
                         p.room = None
                 else:
