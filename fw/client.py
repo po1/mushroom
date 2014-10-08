@@ -82,8 +82,8 @@ class MRClient(BaseClient):
                 return
             thing = cls(' '.join(words[1:]))
             MRDB.objects.append(thing)
-            if MRFW.is_thing(thing) and self.player != None:
-                if self.player.room != None:
+            if MRFW.is_thing(thing) and self.player is not None:
+                if self.player.room is not None:
                     self.player.room.contents.append(thing)
 
     def cmd_play(self, rest):
@@ -98,7 +98,7 @@ class MRClient(BaseClient):
         elif len(found) > 1:
             self.send(MRFW.multiple_choice(found))
         else:
-            if self.player != None:
+            if self.player is not None:
                 self.player.client = None
             self.player = found[0]
             found[0].client = self
@@ -148,6 +148,6 @@ class MRClient(BaseClient):
             cmd(self.player, ' '.join(words[1:]))
 
     def on_disconnect(self):
-        if self.player != None:
+        if self.player is not None:
             self.player.client = None
 
