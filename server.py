@@ -26,6 +26,10 @@ class ClientRegister:
             if c is not client:
                 c.send(msg)
 
+    def shutdown(self):
+        for c in self.clients:
+            c.handler.request.shutdown(socket.SHUT_WR)
+
     def get_uid(self):
         self.lastid += 1
         return self.lastid
@@ -175,11 +179,13 @@ if __name__ == "__main__":
 
     print "Server started and ready to accept connections"
 
-	# Wait for a user shutdown
+    # Wait for a user shutdown
     try:
-        while server_thread.isAlive():
+        while server.running:
             server_thread.join(1)
     except KeyboardInterrupt:
         print "\nGot SIGINT, closing the server..."
 
     server.cr.broadcast("Shutting down...")
+    server.cr.shutdown()
+    server.shutdown()
