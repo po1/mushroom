@@ -1,12 +1,12 @@
 import threading
 import SocketServer
-import time
 import socket
 import string
 import pickle
 
 from config import MRConfig as cfg
-import fw
+from fw import get_class
+
 
 class ClientRegister:
     """
@@ -34,12 +34,18 @@ class ClientRegister:
         self.lastid += 1
         return self.lastid
 
+    def get_client(self, cid):
+        for c, i in self.idmap:
+            if i == cid:
+                return c
+        return None
+
     def add(self, client):
         self.clients.append(client)
-        self.idmap[client.id] = client
+        self.idmap[client] = self.get_uid()
 
     def delete(self, client):
-        del self.idmap[client.id]
+        del self.idmap[client]
         self.clients.remove(client)
 
 
@@ -63,7 +69,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     op_scmds = ['users', 'kick', 'save', 'load', 'shutdown']
 
     def handle(self):
-        client_class = fw.__dict__[cfg.client_class]
+        client_class = get_class(cfg.client_class)
 
         ip = self.request.getpeername()[0]
         self.cl = client_class(self, ip)
@@ -96,7 +102,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         cmd = words[0].lstrip(op_command_prefix)
         if cmd not in self.scmds:
             return False
-        if cmd in self.op_scmds and not self.cl.is_op():
+        if cmd in self.op_scmds and not self.cl.op:
             return False
         return getattr(self, self.scmds[cmd])(string.join(words[1:]))
 
@@ -126,13 +132,13 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return True
 
     def scmd_save(self, rest):
-        db_class = fw.__dict__[cfg.db_class]
+        db_class = get_class(cfg.db_class)
 
         pickle.dump(db_class.objects, open(cfg.db_file, 'wb'))
         return True
 
     def scmd_load(self, rest):
-        db_class = fw.__dict__[cfg.db_class]
+        db_class = get_class(cfg.db_class)
 
         try:
             db_class.objects = pickle.load(open(cfg.db_file, 'rb'))
@@ -143,12 +149,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
     def scmd_kick(self, rest):
         try:
-            id = int(rest)
+            cid = int(rest)
         except ValueError:
             self.wfile.write("Error: not a valid id\n")
         else:
-            if id in self.server.cr.idmap:
-                clnt = self.server.cr.idmap[id]
+            clnt = self.server.cr.get_client(cid)
+            if clnt is not None:
                 req = clnt.handler.wfile
                 req.write("You have been kicked! (ouch...)\n")
                 clnt.handler.silent = True
