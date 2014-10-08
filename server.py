@@ -35,7 +35,7 @@ class ClientRegister:
         return self.lastid
 
     def get_client(self, cid):
-        for c, i in self.idmap:
+        for c, i in self.idmap.iteritems():
             if i == cid:
                 return c
         return None
