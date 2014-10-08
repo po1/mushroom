@@ -75,6 +75,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.cl = client_class(self, ip)
         self.server.cr.add(self.cl)
         self.silent = False
+        self.op = False
 
         print("New client: " + ip)
         self.wfile.write("Welcome!\n")
@@ -102,7 +103,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         cmd = words[0].lstrip(op_command_prefix)
         if cmd not in self.scmds:
             return False
-        if cmd in self.op_scmds and not self.cl.op:
+        if cmd in self.op_scmds and not self.op:
             return False
         return getattr(self, self.scmds[cmd])(string.join(words[1:]))
 
@@ -113,7 +114,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
     def scmd_login(self, rest):
         if rest == cfg.op_password:
-            self.cl.op = True
+            self.op = True
             return True
         return False
 

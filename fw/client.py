@@ -13,7 +13,6 @@ class BaseClient:
     def __init__(self, handler, name):
         self.handler = handler
         self.name = name
-        self.op = False
 
     def send(self, msg):
         try:
