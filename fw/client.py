@@ -125,27 +125,36 @@ class MRClient(BaseClient):
             self.send(str(pbm))
 
     def handle_input(self, data):
+        """
+        Basic handler for commands
+        Looks for commands in (in this order):
+        - client
+        - player
+        - room
+        """
+
+        def clientcmd(fun):
+            def r(pl, rest):
+                return fun(rest)
+            return r
+
         cmds = {}
-        for k in self.cmds.keys():
-            cmds[k] = self
-        if self.player != None:
-            for k in self.player.cmds.keys():
-                cmds[k] = self.player
-            if self.player.room != None:
-                for k in self.player.room.cmds.keys():
-                    cmds[k] = self.player.room
+        for k, c in self.cmds.items():
+            cmds[k] = clientcmd(getattr(self, c))
+        if self.player is not None:
+            for k, c in self.player.cmds.items():
+                cmds[k] = getattr(self.player, c)
+            if self.player.room is not None:
+                for k, c in self.player.room.cmds.items():
+                    cmds[k] = getattr(self.player.room, c)
+
         words = data.split()
         match = filter(lambda x:MRFW.match_name(words[0], x), cmds.keys())
         if len(match) != 1:
             self.send("Huh?")
             return
-        if cmds[match[0]] == self:
-            cmd = getattr(self, self.cmds[match[0]])
-            cmd(' '.join(words[1:]))
-        else:
-            t = cmds[match[0]]
-            cmd = getattr(t, t.cmds[match[0]])
-            cmd(self.player, ' '.join(words[1:]))
+        cmd = cmds[match[0]]
+        cmd(self.player, ' '.join(words[1:]))
 
     def on_disconnect(self):
         if self.player is not None:
