@@ -1,7 +1,7 @@
 import threading
 import SocketServer
 import time
-import socket 
+import socket
 import string
 import pickle
 
@@ -48,7 +48,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     """
     scommand_letter = cfg.op_command_prefix
     sc_password = cfg.op_password
-    
+
     scmds = {'help':'scmd_help',
              'login':'scmd_login',
              'users':'scmd_users',
@@ -89,7 +89,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             return True # no need to parse that further
         if words[0][0] != op_command_prefix:
             return False
-        cmd = words[0].lstrip(op_command_prefix) 
+        cmd = words[0].lstrip(op_command_prefix)
         if cmd not in self.scmds:
             return False
         if cmd in self.op_scmds and not self.cl.is_op():
@@ -114,10 +114,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     def scmd_users(self, rest):
         for c in self.server.cr.clients:
             try:
-                self.wfile.write(`c.id` + "\t" + c.name + "\t" 
+                self.wfile.write(`c.id` + "\t" + c.name + "\t"
                     + c.handler.request.getpeername()[0] + "\n")
             except:
-                self.wfile.write(`c.id` + "\t" + c.name + "\t" 
+                self.wfile.write(`c.id` + "\t" + c.name + "\t"
                     + "SOCK_ERR\n")
         return True
 
@@ -149,7 +149,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 req.write("You have been kicked! (ouch...)\n")
                 clnt.handler.silent = True
                 clnt.handler.request.shutdown(socket.SHUT_RD)
-                self.server.cr.broadcast_except(clnt, clnt.name + 
+                self.server.cr.broadcast_except(clnt, clnt.name +
                     " has been kicked!")
             else:
                 self.wfile.write("Error: not a valid id\n")
