@@ -73,11 +73,14 @@ class MRRoom(MRObject):
     fancy_name = "room"
     cmds = {"say":"cmd_say",
             "emit":"cmd_emit",
+            "link":"cmd_link",
+            "unlink":"cmd_unlink"}
     }
 
     def __init__(self, name):
         super(MRRoom, self).__init__(name)
         self.contents = []
+        self.exits = []
         self.description = "A blank room."
 
     def emit(self, msg):
@@ -94,6 +97,34 @@ class MRRoom(MRObject):
 
     def cmd_emit(self, player, rest):
         self.emit(rest.replace('\\n','\n').replace('\\t','\t'))
+
+    def cmd_link(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+        except EmptyArgException:
+            player.send("Link to where?")
+            return
+        found = MRDB.search(what, MRRoom)
+        if len(found) < 1:
+            player.send("Don't know this place. Is it in Canada?")
+        elif len(found) > 1:
+            player.send(MRFW.multiple_choice(found))
+        else:
+            self.exits.append(found[0])
+
+    def cmd_unlink(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+        except EmptyArgException:
+            player.send("Unlink what?")
+            return
+        match = filter(lambda x:MRFW.match_name(rest, x.name), self.exits)
+        if len(match) < 1:
+            player.send("This room ain't connected to Canada.")
+        elif len(match) > 1:
+            player.send(MRFW.multiple_choice(match))
+        else:
+            self.exits.remove(match[0])
 
 
 class MRPlayer(MRObject):
@@ -247,8 +278,14 @@ class MRPlayer(MRObject):
                     self.send("Contents:")
                 for thing in self.room.contents:
                     self.send(" - " + thing.name)
+                if len(self.room.exits) > 0:
+                    self.send("Nearby places:")
+                for room in self.room.exits:
+                    self.send(" - " + room.name)
+                self.send("")
         elif what == "me" or what==self.name:
                 self.send(self.name + ": " + self.description)
+                self.send("")
         else:
             if self.room is None:
                 self.send("You see nothing but you.")
