@@ -3,6 +3,7 @@ import SocketServer
 import socket
 import string
 import pickle
+import traceback
 
 from config import MRConfig as cfg
 from fw import get_class
@@ -189,6 +190,13 @@ if __name__ == "__main__":
     server_thread.start()
 
     print "Server started and ready to accept connections"
+    print "Loading database..."
+
+    db_class = get_class(cfg.db_class)
+    try:
+        db_class.objects = pickle.load(open(cfg.db_file, 'rb'))
+    except Exception, e:
+        traceback.print_exc()
 
     # Wait for a user shutdown
     try:
