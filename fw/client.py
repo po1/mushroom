@@ -103,15 +103,24 @@ class MRClient(BaseClient):
             self.player = found[0]
             found[0].client = self
 
+    def _safe_env(self):
+        locd = {
+            'me': self.player,
+            'here': self.player.room,
+        }
+        return globals(), locd
+
     def cmd_eval(self, rest):
         try:
-            self.send(str(eval(rest)))
+            genv, lenv = self._safe_env()
+            self.send(str(eval(rest, genv, lenv)))
         except Exception, pbm:
             self.send(str(pbm))
 
     def cmd_exec(self, rest):
         try:
-            exec(rest.replace('\\n','\n').replace('\\t','\t'))
+            genv, lenv = self._safe_env()
+            exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
         except Exception, pbm:
             self.send(str(pbm))
 
