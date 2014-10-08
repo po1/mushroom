@@ -58,6 +58,10 @@ class MRClient(BaseClient):
             self.name = words[0]
 
     def cmd_help(self, rest):
+        if not rest:
+            self.send("Contextual commands:")
+            self.send("  {}".format(', '.join(sorted(self.available_cmds()))))
+        return
         self.send("chat <text>           global chat\n"
                   "name <name>           change your client name\n"
                   "exec <command>        execute python command\n"
