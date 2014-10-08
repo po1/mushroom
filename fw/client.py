@@ -104,8 +104,9 @@ class MRClient(BaseClient):
 
     def _safe_env(self):
         locd = {
+            'client': self,
             'me': self.player,
-            'here': self.player.room,
+            'here': self.player.room if self.player is not None else None,
         }
         return globals(), locd
 
