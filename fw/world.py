@@ -247,3 +247,12 @@ class MRArchi(MRPower):
             exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
         except Exception, pbm:
             self.send(str(pbm))
+
+
+class ArchiPlayer(MRPlayer):
+
+    fancy_name = "archi"
+
+    def __init__(self, name):
+        MRPlayer.__init__(self, name)
+        self.powers.append(MRArchi(self.client))
