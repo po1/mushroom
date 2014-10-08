@@ -102,9 +102,8 @@ class MRClient(BaseClient):
             self.player = found[0]
             found[0].client = self
 
-    def handle_input(self, data):
+    def available_cmds(self):
         """
-        Basic handler for commands
         Looks for commands in (in this order):
         - client
         - player
@@ -128,7 +127,14 @@ class MRClient(BaseClient):
             if self.player.room is not None:
                 for k, c in self.player.room.cmds.items():
                     cmds[k] = getattr(self.player.room, c)
+        return cmds
 
+
+    def handle_input(self, data):
+        """
+        Basic handler for commands
+        """
+        cmds = self.available_cmds()
         words = data.split()
         match = filter(lambda x:MRFW.match_name(words[0], x), cmds.keys())
         if len(match) != 1:
