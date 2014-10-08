@@ -222,18 +222,6 @@ class MRArchi(MRPower):
     cmds = {'eval':'cmd_eval',
             'exec':'cmd_exec'}
 
-    def __init__(self, client):
-        self.client = client
-
-    def _safe_env(self):
-        cl = self.client
-        locd = {
-            'client': cl,
-            'me': cl.player,
-            'here': cl.player.room if cl.player is not None else None,
-        }
-        return globals(), locd
-
     def cmd_eval(self, rest):
         try:
             genv, lenv = self._safe_env()
@@ -255,4 +243,13 @@ class ArchiPlayer(MRPlayer):
 
     def __init__(self, name):
         MRPlayer.__init__(self, name)
-        self.powers.append(MRArchi(self.client))
+        self.powers.append(MRArchi())
+
+    def _safe_env(self):
+        cl = self.client
+        locd = {
+            'client': cl,
+            'me': cl.player,
+            'here': cl.player.room if cl.player is not None else None,
+        }
+        return globals(), locd
