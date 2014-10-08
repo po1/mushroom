@@ -109,7 +109,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
     def scmd_help(self, rest):
         self.wfile.write("List of available server commands:\n")
-        self.wfile.write("  {}\n".format(', '.join(self.scmds)))
+        cmds = list(self.scmds.keys())
+        if not self.op:
+            cmds = [x for x in cmds if x not in self.op_scmds]
+        self.wfile.write("  {}\n".format(', '.join(cmds)))
         return True
 
     def scmd_login(self, rest):
