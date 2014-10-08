@@ -87,13 +87,13 @@ class MRPlayer(MRObject):
         self.client = None
 
     def send(self, msg):
-        if self.client != None:
+        if self.client is not None:
             self.client.send(msg)
 
     def find_thing(self, name):
         if name == "me" or name == self.name:
             return self
-        if self.room == None:
+        if self.room is None:
             raise NotFoundException()
         if name == "here":
             return self.room
@@ -131,7 +131,7 @@ class MRPlayer(MRObject):
         elif len(found) > 1:
             self.send(MRFW.multiple_choice(found))
         else:
-            if self.room != None:
+            if self.room is not None:
                 self.room.contents.remove(self)
                 self.room.broadcast(self.name + ' has gone to ' + found[0].name)
                 found[0].broadcast(self.name + ' arrives from ' + self.room.name)
@@ -153,7 +153,7 @@ class MRPlayer(MRObject):
         except EmptyArgException:
             self.send("Destroy what?")
         else:
-            if self.room != None:
+            if self.room is not None:
                 self.room.broadcast(self.name + " violently destroyed " + thing.name + "!")
                 if MRFW.is_room(thing):
                     self.room.broadcast("You are expulsed into the void of nothingness.")
@@ -163,7 +163,7 @@ class MRPlayer(MRObject):
                     self.room.contents.remove(thing)
             MRDB.objects.remove(thing)
             if MRFW.is_player(thing):
-                if thing.client != None:
+                if thing.client is not None:
                     thing.client.player = None
                     thing.send("Your player has been slain. You were kicked out of it")
 
@@ -174,7 +174,7 @@ class MRPlayer(MRObject):
         except EmptyArgException:
             what = "here"
         if what == "here":
-            if self.room == None:
+            if self.room is None:
                 self.send("You only see nothing. A lot of nothing.")
             else:
                 self.send(self.room.name + ": " + self.room.description)
@@ -187,7 +187,7 @@ class MRPlayer(MRObject):
         elif what == "me" or what==self.name:
                 self.send(self.name + ": " + self.description)
         else:
-            if self.room == None:
+            if self.room is None:
                 self.send("You see nothing but you.")
             else:
                 try:
