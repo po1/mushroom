@@ -123,12 +123,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
     def scmd_users(self, rest):
         for c in self.server.cr.clients:
+            cid = self.server.cr.idmap[c]
             try:
-                self.wfile.write(`c.id` + "\t" + c.name + "\t"
-                    + c.handler.request.getpeername()[0] + "\n")
+                self.wfile.write("{}\t{}\t{}\n".format(cid, c.name,
+                    c.handler.request.getpeername()[0]))
             except:
-                self.wfile.write(`c.id` + "\t" + c.name + "\t"
-                    + "SOCK_ERR\n")
+                self.wfile.write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
         return True
 
     def scmd_save(self, rest):
