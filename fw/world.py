@@ -44,7 +44,7 @@ class MRObject(object):
         txt = cmd_txt.replace('\n', '\n\t')
         txt = ("def ___tmp(self, player, rest):\n"
                "\t{}\n\n"
-               "self.{} = ___tmp.__get__(self, {})
+               "self.{} = ___tmp.__get__(self, {})"
                .format(txt, cmd_name, self.__class__.name))
         exec(txt)
 
@@ -71,10 +71,11 @@ class MRRoom(MRObject):
     """
 
     fancy_name = "room"
-    cmds = {"say":"cmd_say",
-            "emit":"cmd_emit",
-            "link":"cmd_link",
-            "unlink":"cmd_unlink"}
+    cmds = {
+            "say"    : "cmd_say",
+            "emit"   : "cmd_emit",
+            "link"   : "cmd_link",
+            "unlink" : "cmd_unlink"
     }
 
     def __init__(self, name):
