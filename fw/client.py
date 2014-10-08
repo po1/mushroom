@@ -2,7 +2,7 @@ from .util import MRFW
 from .util import EmptyArgException
 from .util import log_err
 
-from .world import MRPlayer
+from .world import get_type
 from .db import MRDB
 
 
@@ -72,14 +72,14 @@ class MRClient(BaseClient):
         if len(words) < 2:
             self.send("Cannot create a nameless thing...")
             return
-        cls = filter(lambda x:MRFW.match_name(words[0], x.fancy_name), MRDB.classes)
-        if len(cls) != 1:
+        cls = get_type(words[0])
+        if cls is None:
             self.send("Create a what?")
         else:
             if len(MRDB.search(words[1])) > 0:
                 self.send("Uhm... something by that name already exists...")
                 return
-            thing = cls[0](words[1])
+            thing = cls(' '.join(words[1:]))
             MRDB.objects.append(thing)
             if MRFW.is_thing(thing) and self.player != None:
                 if self.player.room != None:
@@ -91,7 +91,7 @@ class MRClient(BaseClient):
         except EmptyArgException:
             self.send("Play who?")
             return
-        found = MRDB.search(who, MRPlayer)
+        found = MRDB.search(who, get_type('player'))
         if len(found) < 1:
             self.send("Couldn't find the guy.")
         elif len(found) > 1:

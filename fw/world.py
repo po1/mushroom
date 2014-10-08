@@ -1,6 +1,19 @@
 from .util import MRFW
 from .util import NotFoundException, AmbiguousException, EmptyArgException
 
+
+types = ['thing', 'room', 'player']
+
+
+def get_type(fancy_name):
+    if fancy_name not in types:
+        return None
+    for c in globals().itervalues():
+        if getattr(c, 'fancy_name', None) == fancy_name:
+            return c
+    return None
+
+
 class MRObject(object):
     """
     The base object class of the world.

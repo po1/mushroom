@@ -9,7 +9,6 @@ class MRDB:
     an interface...
     """
 
-    #classes = [MRThing, MRRoom, MRPlayer]
     objects = []
 
     @staticmethod
