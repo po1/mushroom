@@ -21,6 +21,33 @@ class MRObject(object):
 
     def __init__(self, name):
         self.name = name
+        self.custom_cmds = {}
+
+    def __getstate__(self):
+        odict = self.__dict__.copy()
+        for cmd in self.custom_cmds:
+            del odict[self.cmds[cmd]]
+        return odict
+
+    def __setstate__(self, mdict):
+        self.__dict__.update(mdict)
+        sample = self.__class__("sample")
+        self.__dict__.update(dict([(k, sample.__dict__[k]) for k in
+                                   [x for x in sample.__dict__
+                                    if x not in mdict]]))
+        for cmd in self.custom_cmds:
+            mcmd = self.custom_cmds[cmd]
+            self.add_cmd(cmd, mcmd[0], mcmd[1])
+
+    def add_cmd(self, cmd, cmd_name, cmd_txt):
+        self.cmds[cmd] = cmd_name
+        txt = cmd_txt.replace('\n', '\n\t')
+        txt = ("def ___tmp(self, player, rest):\n"
+               "\t{}\n\n"
+               "self.{} = ___tmp.__get__(self, {})
+               .format(txt, cmd_name, self.__class__.name))
+        exec(txt)
+
 
 
 class MRThing(MRObject):
@@ -66,10 +93,13 @@ class MRPlayer(MRObject):
     """
 
     fancy_name = "player"
-    cmds = {"look":"cmd_look",
-            "go":"cmd_go",
-            'describe':'cmd_describe',
-            "destroy":"cmd_destroy"}
+    cmds = {
+            "look"     : "cmd_look",
+            "go"       : "cmd_go",
+            "describe" : "cmd_describe",
+            "cmd"      : "cmd_cmd",
+            "destroy"  : "cmd_destroy",
+    }
 
     def __init__(self, name):
         super(MRPlayer, self).__init__(name)
@@ -79,12 +109,12 @@ class MRPlayer(MRObject):
         self.powers = []
 
     def __getstate__(self):
-        odict = self.__dict__.copy()
+        odict = super(MRPlayer, self).__getstate__()
         del odict['client']
         return odict
 
     def __setstate__(self, dict):
-        self.__dict__.update(dict)
+        super(MRPlayer, self).__setstate__(dict)
         self.client = None
 
     def send(self, msg):
@@ -117,6 +147,27 @@ class MRPlayer(MRObject):
             self.send("Describe what?")
         else:
             thing.description = ' '.join(rest.split()[1:])
+
+
+    def cmd_cmd(self, player, rest):
+        try:
+            what = MRFW.get_first_arg(rest)
+            thing = self.find_thing(what)
+        except AmbiguousException, ex:
+            self.send(MRFW.multiple_choice(ex.choices))
+        except NotFoundException:
+            self.send("You see nothing like '" + what + "' here.")
+        except EmptyArgException:
+            self.send("What do you want to add a command to?")
+        else:
+            if len(rest.split()) < 2:
+                self.send("I need a command name.")
+                return
+            cmd = rest.split()[1]
+            cmd_name = "cmd_" + cmd
+            cmd_txt = string.join(rest.split()[2:]).replace('\\n','\n').replace('\\t','\t')
+            thing.custom_cmds[cmd] = (cmd_name, cmd_txt)
+            thing.add_cmd(cmd, cmd_name, cmd_txt)
 
     def cmd_go(self, player, rest):
         from .db import MRDB
