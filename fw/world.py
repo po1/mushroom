@@ -45,7 +45,7 @@ class MRObject(object):
         txt = ("def ___tmp(self, player, rest):\n"
                "\t{}\n\n"
                "self.{} = ___tmp.__get__(self, {})"
-               .format(txt, cmd_name, self.__class__.name))
+               .format(txt, cmd_name, self.__class__.__name__))
         exec(txt)
 
 
@@ -208,7 +208,7 @@ class MRPlayer(MRObject):
                 return
             cmd = rest.split()[1]
             cmd_name = "cmd_" + cmd
-            cmd_txt = string.join(rest.split()[2:]).replace('\\n','\n').replace('\\t','\t')
+            cmd_txt = ' '.join(rest.split()[2:]).replace('\\n','\n').replace('\\t','\t')
             thing.custom_cmds[cmd] = (cmd_name, cmd_txt)
             thing.add_cmd(cmd, cmd_name, cmd_txt)
 
