@@ -187,7 +187,8 @@ class MRPlayer(MRObject):
         except EmptyArgException:
             self.send("Describe what?")
         else:
-            thing.description = ' '.join(rest.split()[1:])
+            thing.description = (' '.join(rest.split()[1:])
+                                 .replace('\\n','\n').replace('\\t','\t'))
 
 
     def cmd_cmd(self, player, rest):
