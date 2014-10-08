@@ -107,7 +107,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return getattr(self, self.scmds[cmd])(string.join(words[1:]))
 
     def scmd_help(self, rest):
-        self.wfile.write("No help for now\n")
+        self.wfile.write("List of available server commands:\n")
+        self.wfile.write("  {}\n".format(', '.join(self.scmds)))
         return True
 
     def scmd_login(self, rest):

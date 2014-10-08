@@ -62,6 +62,7 @@ class MRClient(BaseClient):
         self.send("chat <text>           global chat\n"
                   "name <name>           change your client name\n"
                   "exec <command>        execute python command\n"
+                  "eval <expression>     evaluate python expression\n"
                   "create <type> <name>  thing, player, or room\n"
                   "play <name>           go in the shoes of a player\n"
                   "go <place>            move to a room\n"
