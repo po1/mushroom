@@ -173,14 +173,13 @@ if __name__ == "__main__":
     server.cr = ClientRegister()
     server_thread.start()
 
-    print "Server loop running in thread:", server_thread.getName()
+    print "Server started and ready to accept connections"
 
 	# Wait for a user shutdown
-    while server.running:
-        try:
-            time.sleep(0.5)
-        except KeyboardInterrupt:
-            print "\nGot ^C, closing the server..."
-            break
+    try:
+        while server_thread.isAlive():
+            server_thread.join(1)
+    except KeyboardInterrupt:
+        print "\nGot SIGINT, closing the server..."
 
     server.cr.broadcast("Shutting down...")
