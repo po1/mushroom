@@ -49,6 +49,7 @@ def find_and_do(player, rest, dofun, search_list,
                 ):
     try:
         what = rest.split()[0]
+        rest = ' '.join(rest.split()[1:])
     except IndexError:
         if arg_default is None:
             player.send(noarg)
@@ -58,13 +59,13 @@ def find_and_do(player, rest, dofun, search_list,
     if short_names is None:
         short_names = player_snames(player)
     if what in short_names:
-        dofun(short_names[what])
+        dofun(short_names[what], rest)
     elif len(found) < 1:
         player.send(notfound.format(what))
     elif len(found) > 1:
         player.send(multiple_choice(found))
     else:
-        dofun(found[0])
+        dofun(found[0], rest)
 
 
 def multiple_choice(choices):

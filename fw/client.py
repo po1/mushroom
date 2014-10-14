@@ -69,7 +69,7 @@ class MRClient(BaseClient):
                     self.player.room.contents.append(thing)
 
     def cmd_play(self, rest):
-        def doit(arg):
+        def doit(arg, _):
             if self.player is not None:
                 self.player.client = None
             self.player = arg

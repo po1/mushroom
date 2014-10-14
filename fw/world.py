@@ -67,7 +67,7 @@ class MRRoom(MRObject):
         self.emit(rest.replace('\\n','\n').replace('\\t','\t'))
 
     def cmd_link(self, player, rest):
-        def doit(arg):
+        def doit(arg, _):
             self.exits.append(arg)
 
         util.find_and_do(player, rest, doit,
@@ -75,7 +75,7 @@ class MRRoom(MRObject):
                          notfound="Don't know this place. Is it in Canada?")
 
     def cmd_unlink(self, player, rest):
-        def doit(arg):
+        def doit(arg, _):
             self.exits.remove(arg)
 
         util.find_and_do(player, rest, doit,
@@ -134,14 +134,14 @@ class MRPlayer(MRObject):
                          **kwargs)
 
     def cmd_describe(self, player, rest):
-        def doit(thing):
+        def doit(thing, _):
             thing.description = (' '.join(rest.split()[1:])
                                  .replace('\\n','\n').replace('\\t','\t'))
 
         self.find_doit(rest, doit, noarg="Describe what?")
 
     def cmd_cmd(self, player, rest):
-        def doit(thing):
+        def doit(thing, _):
             if len(rest.split()) < 2:
                 self.send("I need a command name.")
                 return
@@ -154,7 +154,7 @@ class MRPlayer(MRObject):
         self.find_doit(rest, doit, noarg="Add a command to what?")
 
     def cmd_go(self, player, rest):
-        def doit(arg):
+        def doit(arg, _):
             if self.room is not None:
                 self.room.contents.remove(self)
                 self.room.emit(self.name + ' has gone to ' + arg.name)
@@ -171,7 +171,7 @@ class MRPlayer(MRObject):
                          notfound="Don't know this place. Is it in Canada?")
 
     def cmd_destroy(self, player, rest):
-        def doit(thing):
+        def doit(thing, _):
             if self.room is not None:
                 self.room.emit(self.name + " violently destroyed " + thing.name + "!")
                 if util.is_room(thing):
@@ -189,7 +189,7 @@ class MRPlayer(MRObject):
         self.find_doit(rest, doit, noarg="Destroy what?")
 
     def cmd_look(self, player, rest):
-        def doit(arg):
+        def doit(arg, _):
             if arg is None:
                 self.send("You only see nothing. A lot of nothing.")
                 return
