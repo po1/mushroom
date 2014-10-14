@@ -39,7 +39,7 @@ class MRClient(BaseClient):
         if not rest:
             self.send("Contextual commands:")
             self.send("  {}".format(', '.join(sorted(self.available_cmds()))))
-        return
+        # TODO: add help topics for each command
         self.send("chat <text>           global chat\n"
                   "name <name>           change your client name\n"
                   "exec <command>        execute python command\n"
