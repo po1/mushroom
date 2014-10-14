@@ -86,3 +86,24 @@ def multiple_choice(choices):
     names = map(lambda x:x.name, choices)
     return "Which one?\nChoices are: " + ', '.join(names)
 
+
+def myrepr(obj):
+    if type(obj) in (str, int, float, bool):
+        return repr(obj)
+    elif type(obj) is list:
+        return '[{}]'.format(', '.join([myrepr(x) for x in obj]))
+    elif type(obj) is tuple:
+        return '({})'.format(', '.join([myrepr(x) for x in obj]))
+    elif type(obj) is dict:
+        return '{{{}}}'.format(', '.join(['{}: {}'.format(myrepr(k), myrepr(v))
+                                            for k, v in obj.items()]))
+    elif obj is None:
+        return 'None'
+    else:
+        return '<{}>'.format(obj.__class__.__name__)
+
+
+def get_param(obj, addr):
+    if not addr:
+        return obj
+    return get_param(getattr(obj, addr[0]), addr[1:])
