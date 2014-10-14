@@ -52,10 +52,13 @@ class BaseObject(object):
             self.add_cmd(cmd, mcmd[0], mcmd[1])
 
     def add_cmd(self, cmd, cmd_name, cmd_txt):
+        self.custom_cmds[cmd] = (cmd_name, cmd_txt)
         self.cmds[cmd] = cmd_name
+        locs = locals()
+        locs[self.__class__.__name__] = self.__class__
         txt = cmd_txt.replace('\n', '\n\t')
         txt = ("def ___tmp(self, who, rest):\n"
                "\t{}\n\n"
                "self.{} = ___tmp.__get__(self, {})"
                .format(txt, cmd_name, self.__class__.__name__))
-        exec(txt)
+        exec(txt, globals(), locs)
