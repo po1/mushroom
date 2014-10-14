@@ -347,9 +347,11 @@ class ArchiPlayer(MRPlayer):
         self.powers.append(MRArchi())
 
     def _safe_env(self):
+        from .db import MRDB
         cl = self.client
         locd = {
             'client': cl,
+            'db': MRDB,
             'me': cl.player,
             'here': cl.player.room if cl.player is not None else None,
         }
