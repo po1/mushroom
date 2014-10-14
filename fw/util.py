@@ -1,8 +1,22 @@
 from __future__ import print_function
 
+import types
+
 from .register import get_type
 
 import sys
+
+member_types = (
+    types.BooleanType,
+    types.DictType,
+    types.FloatType,
+    types.IntType,
+    types.ListType,
+    types.NoneType,
+    types.StringType,
+    types.TupleType,
+    types.UnicodeType,
+)
 
 def log_err(msg):
     print(msg, file=sys.stderr)
