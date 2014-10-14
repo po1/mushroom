@@ -1,6 +1,6 @@
-from .util import MRFW
-from .util import EmptyArgException
 from .util import log_err
+
+from . import util
 
 from .world import get_type
 from .db import MRDB
@@ -85,26 +85,22 @@ class MRClient(BaseClient):
                 return
             thing = cls(' '.join(words[1:]))
             MRDB.objects.append(thing)
-            if MRFW.is_thing(thing) and self.player is not None:
+            if util.is_thing(thing) and self.player is not None:
                 if self.player.room is not None:
                     self.player.room.contents.append(thing)
 
     def cmd_play(self, rest):
-        try:
-            who = MRFW.get_first_arg(rest)
-        except EmptyArgException:
-            self.send("Play who?")
-            return
-        found = MRDB.search(who, get_type('player'))
-        if len(found) < 1:
-            self.send("Couldn't find the guy.")
-        elif len(found) > 1:
-            self.send(MRFW.multiple_choice(found))
-        else:
+        def doit(arg):
             if self.player is not None:
                 self.player.client = None
-            self.player = found[0]
-            found[0].client = self
+            self.player = arg
+            arg.client = self
+
+        util.find_and_do(self, rest, doit,
+                         MRDB.list_all(get_type('player')),
+                         short_names=[],
+                         noarg="Play who?",
+                         notfound="Couldn't find the guy.")
 
     def available_cmds(self):
         """
@@ -140,7 +136,7 @@ class MRClient(BaseClient):
         """
         cmds = self.available_cmds()
         words = data.split()
-        match = filter(lambda x:MRFW.match_name(words[0], x), cmds.keys())
+        match = filter(lambda x:util.match_name(words[0], x), cmds.keys())
         if len(match) != 1:
             self.send("Huh?")
             return

@@ -1,5 +1,5 @@
 from .world import MRObject
-from .util import MRFW
+from . import util
 
 class MRDB:
     """
@@ -15,7 +15,7 @@ class MRDB:
     def search(name, type = MRObject):
         found = []
         for thing in MRDB.objects:
-            if MRFW.match_name(name, thing.name):
+            if util.match_name(name, thing.name):
                 if isinstance(thing, type):
                     found.append(thing)
         return found

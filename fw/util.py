@@ -6,61 +6,71 @@ def log_err(msg):
     print(msg, file=sys.stderr)
 
 
-class MRFW:
-    """
-    A toolbox of useful functions for the FW.
-    Should probably be more structured, or not
-    set as a bunch of static methods...
-    """
-
-    @staticmethod
-    def is_type(thing, type):
-        try:
-            if thing.__class__.fancy_name == type:
-                return True
-        except:
-            pass
-        return False
-
-    @staticmethod
-    def is_room(thing):
-        return MRFW.is_type(thing, "room")
-
-    @staticmethod
-    def is_thing(thing):
-        return MRFW.is_type(thing, "thing")
-
-    @staticmethod
-    def is_player(thing):
-        return MRFW.is_type(thing, "player")
-
-    @staticmethod
-    def match_name(short, name):
-        if short == name[:len(short)]:
+def is_type(thing, type):
+    try:
+        if thing.__class__.fancy_name == type:
             return True
-        return False
-
-    @staticmethod
-    def get_first_arg(data):
-        words = data.split()
-        if len(words) < 1:
-            raise EmptyArgException()
-        return words[0]
-
-    @staticmethod
-    def multiple_choice(choices):
-        names = map(lambda x:x.name, choices)
-        return "Which one?\nChoices are: " + ', '.join(names)
+    except:
+        pass
+    return False
 
 
-# A bunch of exceptions... quite handy
-class AmbiguousException(Exception):
-    def __init__(self, choices):
-        self.choices = choices
+def is_room(thing):
+    return is_type(thing, "room")
 
-class NotFoundException(Exception):
-    pass
 
-class EmptyArgException(Exception):
-    pass
+def is_thing(thing):
+    return is_type(thing, "thing")
+
+
+def is_player(thing):
+    return is_type(thing, "player")
+
+
+def match_name(short, name):
+    if short == name[:len(short)]:
+        return True
+    return False
+
+
+def match_list(short, elts):
+    return filter(lambda x:match_name(short, x.name), elts)
+
+
+def player_snames(player, allow_no_room=False):
+    sn = {'me': player}
+    if player.room is not None or allow_no_room:
+        sn['here'] = player.room
+    return sn
+
+
+def find_and_do(player, rest, dofun, search_list,
+                arg_default=None,
+                short_names=None,
+                noarg="Pardon?",
+                notfound="You see nothing like '{}' here.",
+                ):
+    try:
+        what = rest.split()[0]
+    except IndexError:
+        if arg_default is None:
+            player.send(noarg)
+            return
+        what = arg_default
+    found = match_list(what, search_list)
+    if short_names is None:
+        short_names = player_snames(player)
+    if what in short_names:
+        dofun(short_names[what])
+    elif len(found) < 1:
+        player.send(notfound.format(what))
+    elif len(found) > 1:
+        player.send(multiple_choice(found))
+    else:
+        dofun(found[0])
+
+
+def multiple_choice(choices):
+    names = map(lambda x:x.name, choices)
+    return "Which one?\nChoices are: " + ', '.join(names)
 
