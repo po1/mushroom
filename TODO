@@ -4,3 +4,9 @@
  - automation: separate thread that performs registered actions at regular intervals
 - command object
    . that would contain the command name, action, error messages, help topic
+ - commands:
+   . examine
+ - better handling of things
+   . container
+   . commands
+ - db number for stuff
