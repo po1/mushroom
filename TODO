@@ -2,9 +2,5 @@
  - extension of the fw:
    . a bunch of utility methods (oemit, aemit...)
  - automation: separate thread that performs registered actions at regular intervals
- - global class register?
-   . we need to be able to get a list of available world classes
-   . they should be hierarchically organized
-   . some kind of automated loading
 - command object
    . that would contain the command name, action, error messages, help topic
