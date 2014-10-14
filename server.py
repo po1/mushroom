@@ -2,7 +2,6 @@ import threading
 import SocketServer
 import socket
 import string
-import pickle
 import traceback
 
 from config import MRConfig as cfg
