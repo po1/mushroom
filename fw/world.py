@@ -1,5 +1,7 @@
 from . import util
 
+from .interface import BaseObject
+
 
 def get_type(fancy_name):
     for c in globals().itervalues():
@@ -8,44 +10,13 @@ def get_type(fancy_name):
     return None
 
 
-class MRObject(object):
+class MRObject(BaseObject):
     """
     The base object class of the world.
     Every object belonging to the world
-    should inherit from this class
+    must inherit from this class
     """
-
-    fancy_name = "object"
-    cmds = {}
-
-    def __init__(self, name):
-        self.name = name
-        self.custom_cmds = {}
-
-    def __getstate__(self):
-        odict = self.__dict__.copy()
-        for cmd in self.custom_cmds:
-            del odict[self.cmds[cmd]]
-        return odict
-
-    def __setstate__(self, mdict):
-        self.__dict__.update(mdict)
-        sample = self.__class__("sample")
-        self.__dict__.update(dict([(k, sample.__dict__[k]) for k in
-                                   [x for x in sample.__dict__
-                                    if x not in mdict]]))
-        for cmd in self.custom_cmds:
-            mcmd = self.custom_cmds[cmd]
-            self.add_cmd(cmd, mcmd[0], mcmd[1])
-
-    def add_cmd(self, cmd, cmd_name, cmd_txt):
-        self.cmds[cmd] = cmd_name
-        txt = cmd_txt.replace('\n', '\n\t')
-        txt = ("def ___tmp(self, player, rest):\n"
-               "\t{}\n\n"
-               "self.{} = ___tmp.__get__(self, {})"
-               .format(txt, cmd_name, self.__class__.__name__))
-        exec(txt)
+    pass
 
 
 class MRThing(MRObject):

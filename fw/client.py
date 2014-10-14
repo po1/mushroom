@@ -1,30 +1,8 @@
-from .util import log_err
-
 from . import util
 
 from .world import get_type
 from .db import MRDB
-
-
-class BaseClient:
-    """
-    Base class for MUSHRoom clients
-    """
-    def __init__(self, handler, name):
-        self.handler = handler
-        self.name = name
-
-    def send(self, msg):
-        try:
-            self.handler.wfile.write(msg + "\n")
-        except:
-            log_err("Could not send to " + self.name)
-
-    def handle_input(self, data):
-        pass
-
-    def on_disconnect(self):
-        pass
+from .interface import BaseClient
 
 
 class MRClient(BaseClient):
