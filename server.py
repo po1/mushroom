@@ -6,7 +6,8 @@ import pickle
 import traceback
 
 from config import MRConfig as cfg
-from fw import get_class
+from fw import Client
+from fw import Database
 
 
 class ClientRegister:
@@ -70,10 +71,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     op_scmds = ['users', 'kick', 'save', 'load', 'shutdown']
 
     def handle(self):
-        client_class = get_class(cfg.client_class)
-
         ip = self.request.getpeername()[0]
-        self.cl = client_class(self, ip)
+        self.cl = Client(self, ip)
         self.server.cr.add(self.cl)
         self.silent = False
         self.op = False
@@ -138,16 +137,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return True
 
     def scmd_save(self, rest):
-        db_class = get_class(cfg.db_class)
-
-        pickle.dump(db_class.objects, open(cfg.db_file, 'wb'))
+        Database.dump(cfg.db_file)
         return True
 
     def scmd_load(self, rest):
-        db_class = get_class(cfg.db_class)
-
         try:
-            db_class.objects = pickle.load(open(cfg.db_file, 'rb'))
+            Database.load(cfg.db_file)
         except Exception, e:
             self.wfile.write("Load failed. Check server log.\n")
             print e
@@ -192,9 +187,8 @@ if __name__ == "__main__":
     print "Server started and ready to accept connections"
     print "Loading database..."
 
-    db_class = get_class(cfg.db_class)
     try:
-        db_class.objects = pickle.load(open(cfg.db_file, 'rb'))
+        Database.load(cfg.db_file)
     except Exception, e:
         traceback.print_exc()
 

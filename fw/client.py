@@ -1,7 +1,7 @@
 from . import util
+from . import db
 
-from .world import get_type
-from .db import MRDB
+from .register import get_type
 from .interface import BaseClient
 
 
@@ -58,11 +58,11 @@ class MRClient(BaseClient):
         if cls is None:
             self.send("Create a what?")
         else:
-            if len(MRDB.search(words[1])) > 0:
+            if len(db.search(words[1])) > 0:
                 self.send("Uhm... something by that name already exists...")
                 return
             thing = cls(' '.join(words[1:]))
-            MRDB.objects.append(thing)
+            db.objects.append(thing)
             if util.is_thing(thing) and self.player is not None:
                 if self.player.room is not None:
                     self.player.room.contents.append(thing)
@@ -75,7 +75,7 @@ class MRClient(BaseClient):
             arg.client = self
 
         util.find_and_do(self, rest, doit,
-                         MRDB.list_all(get_type('player')),
+                         db.list_all(get_type('player')),
                          short_names=[],
                          noarg="Play who?",
                          notfound="Couldn't find the guy.")

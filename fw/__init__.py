@@ -1,6 +1,10 @@
-from .client import MRClient
-from .db import MRDB
+from . import client
+from . import db
+from . import world
 
-def get_class(name):
-    return globals()[name]
+from .register import get_class
+from .register import get_type
 
+# this will be loaded by the server
+Database = db
+Client = client.MRClient

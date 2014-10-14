@@ -1,25 +1,32 @@
-from .world import MRObject
+import pickle
+
 from . import util
+from .interface import BaseObject
 
-class MRDB:
-    """
-    The class holding the world.
-    This class shares an interface with the
-    server and should inherit from such
-    an interface...
-    """
 
-    objects = []
+""" The database holding the world.  """
+objects = []
 
-    @staticmethod
-    def search(name, type = MRObject):
-        found = []
-        for thing in MRDB.objects:
-            if util.match_name(name, thing.name):
-                if isinstance(thing, type):
-                    found.append(thing)
-        return found
 
-    @staticmethod
-    def list_all(type):
-        return MRDB.search("", type)
+def load(db_file):
+    global objects
+    with open(db_file, 'rb') as f:
+        objects = pickle.load(f)
+
+
+def dump(db_file):
+    with open(db_file, 'wb') as f:
+        pickle.dump(objects, f)
+
+
+def search(name, type=BaseObject):
+    found = []
+    for thing in objects:
+        if util.match_name(name, thing.name):
+            if isinstance(thing, type):
+                found.append(thing)
+    return found
+
+
+def list_all(type):
+    return search("", type)

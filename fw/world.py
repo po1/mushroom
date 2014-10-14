@@ -1,15 +1,11 @@
 from . import util
+from . import db
 
 from .interface import BaseObject
+from .register import register
 
 
-def get_type(fancy_name):
-    for c in globals().itervalues():
-        if getattr(c, 'fancy_name', None) == fancy_name:
-            return c
-    return None
-
-
+@register
 class MRObject(BaseObject):
     """
     The base object class of the world.
@@ -19,6 +15,7 @@ class MRObject(BaseObject):
     pass
 
 
+@register
 class MRThing(MRObject):
     """
     Things that are not players or rooms.
@@ -32,6 +29,7 @@ class MRThing(MRObject):
         self.description = "A boring non-descript thing."
 
 
+@register
 class MRRoom(MRObject):
     """
     The parent class for every room of
@@ -72,9 +70,8 @@ class MRRoom(MRObject):
         def doit(arg):
             self.exits.append(arg)
 
-        from .db import MRDB
         util.find_and_do(player, rest, doit,
-                         MRDB.list_all(MRRoom),
+                         db.list_all(MRRoom),
                          notfound="Don't know this place. Is it in Canada?")
 
     def cmd_unlink(self, player, rest):
@@ -87,6 +84,7 @@ class MRRoom(MRObject):
                          )
 
 
+@register
 class MRPlayer(MRObject):
     """
     Basic Player.
@@ -167,16 +165,13 @@ class MRPlayer(MRObject):
             self.room.contents.append(self)
             self.cmd_look(self, "here")
 
-        from .db import MRDB
         util.find_and_do(player, rest, doit,
-                         MRDB.list_all(MRRoom),
+                         db.list_all(MRRoom),
                          noarg="Go where?",
                          notfound="Don't know this place. Is it in Canada?")
 
     def cmd_destroy(self, player, rest):
         def doit(thing):
-            from .db import MRDB
-
             if self.room is not None:
                 self.room.emit(self.name + " violently destroyed " + thing.name + "!")
                 if util.is_room(thing):
@@ -185,7 +180,7 @@ class MRPlayer(MRObject):
                         p.room = None
                 else:
                     self.room.contents.remove(thing)
-            MRDB.objects.remove(thing)
+            db.objects.remove(thing)
             if util.is_player(thing):
                 if thing.client is not None:
                     thing.client.player = None
@@ -223,6 +218,7 @@ class MRPlayer(MRObject):
                          notfound=notfound)
 
 
+@register
 class MRPower(object):
     cmds = {}
 
@@ -235,6 +231,7 @@ class MRPower(object):
         return a
 
 
+@register
 class MRArchi(MRPower):
     """
     Architect class
@@ -259,6 +256,7 @@ class MRArchi(MRPower):
             self.send(str(pbm))
 
 
+@register
 class ArchiPlayer(MRPlayer):
 
     fancy_name = "archi"
@@ -268,11 +266,10 @@ class ArchiPlayer(MRPlayer):
         self.powers.append(MRArchi())
 
     def _safe_env(self):
-        from .db import MRDB
         cl = self.client
         locd = {
             'client': cl,
-            'db': MRDB,
+            'db': db,
             'me': cl.player,
             'here': cl.player.room if cl.player is not None else None,
         }
