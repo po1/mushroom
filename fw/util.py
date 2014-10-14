@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+from .register import get_type
+
 import sys
 
 def log_err(msg):
@@ -7,12 +9,7 @@ def log_err(msg):
 
 
 def is_type(thing, type):
-    try:
-        if thing.__class__.fancy_name == type:
-            return True
-    except:
-        pass
-    return False
+    return isinstance(thing, get_type(type))
 
 
 def is_room(thing):
