@@ -98,6 +98,7 @@ class MRPlayer(MRObject):
             "describe" : "cmd_describe",
             "cmd"      : "cmd_cmd",
             "destroy"  : "cmd_destroy",
+            "examine"  : "cmd_examine",
     }
 
     def __init__(self, name):
@@ -215,6 +216,37 @@ class MRPlayer(MRObject):
                          short_names=util.player_snames(self, allow_no_room=True),
                          arg_default="here",
                          notfound=notfound)
+
+    def cmd_examine(self, player, rest):
+        def doit(arg, rest):
+            if rest:
+                arg_name = '.'.join([arg.name] + rest.split())
+                try:
+                    arg = util.get_param(arg, rest.split())
+                except AttributeError:
+                    self.send("{} has no attribute {}".format(arg.name, '.'.join(rest)))
+                    return
+            else:
+                arg_name = arg.name
+            self.send('{}: {}'.format(arg_name, util.myrepr(arg)))
+            internals = {}
+            for attr in dir(arg):
+                if attr[0] == '_':
+                    continue
+                attr_val = getattr(arg, attr)
+                if not isinstance(attr_val, util.member_types + (BaseObject,)):
+                    continue
+                internals[attr] = util.myrepr(attr_val)
+            if internals:
+                self.send("Internals:")
+                for k in sorted(internals):
+                    self.send(" - {}: {}".format(k, internals[k]))
+
+        rest = ' '.join(rest.split('.'))
+        util.find_and_do(player, rest, doit,
+                         self.reachable_objects(),
+                         short_names=util.player_snames(self),
+                         arg_default="here")
 
 
 @register
