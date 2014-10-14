@@ -82,8 +82,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             try:
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data);
-            except Exception, e:
-                print e
+            except Exception:
+                traceback.print_exc()
                 self.wfile.write("An error occured. Please reconnect...\n")
                 break
         print("Client disconnected: " + ip)
