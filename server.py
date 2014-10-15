@@ -82,9 +82,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             try:
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data);
-            except (SystemExit, KeyboardInterrupt):
-                raise
-            except:
+            except Exception:
                 traceback.print_exc()
                 self.wfile.write("An error occured. Please reconnect...\n")
                 break
@@ -147,9 +145,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             Database.load(cfg.db_file)
         except IOError:
             self.wfile.write("Could not load: database not found.\n")
-        except (SystemExit, KeyboardInterrupt):
-            raise
-        except:
+        except Exception:
             self.wfile.write("Load failed. Check server log.\n")
             traceback.print_exc()
         return True
