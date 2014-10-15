@@ -278,14 +278,18 @@ class MRArchi(MRPower):
         try:
             genv, lenv = self._safe_env()
             self.send(str(eval(rest, genv, lenv)))
-        except Exception, pbm:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception as pbm:
             self.send(str(pbm))
 
     def cmd_exec(self, rest):
         try:
             genv, lenv = self._safe_env()
             exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
-        except Exception, pbm:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception as pbm:
             self.send(str(pbm))
 
 

@@ -82,7 +82,9 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             try:
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data);
-            except Exception:
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except:
                 traceback.print_exc()
                 self.wfile.write("An error occured. Please reconnect...\n")
                 break
@@ -131,7 +133,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             try:
                 self.wfile.write("{}\t{}\t{}\n".format(cid, c.name,
                     c.handler.request.getpeername()[0]))
-            except:
+            except socket.error:
+                traceback.print_exc()
                 self.wfile.write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
         return True
 
@@ -142,9 +145,13 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     def scmd_load(self, rest):
         try:
             Database.load(cfg.db_file)
-        except Exception, e:
+        except IOError:
+            self.wfile.write("Could not load: database not found.\n")
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except:
             self.wfile.write("Load failed. Check server log.\n")
-            print e
+            traceback.print_exc()
         return True
 
     def scmd_kick(self, rest):
@@ -188,8 +195,9 @@ if __name__ == "__main__":
 
     try:
         Database.load(cfg.db_file)
-    except Exception, e:
-        traceback.print_exc()
+        print("Database successfully loaded")
+    except IOError:
+        print("Database not found")
 
     # Wait for a user shutdown
     try:
