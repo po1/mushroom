@@ -190,8 +190,8 @@ if __name__ == "__main__":
     server.cr = ClientRegister()
     server_thread.start()
 
-    print "Server started and ready to accept connections"
-    print "Loading database..."
+    print("Server started and ready to accept connections")
+    print("Loading database...")
 
     try:
         Database.load(cfg.db_file)
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         while server.running:
             server_thread.join(1)
     except KeyboardInterrupt:
-        print "\nGot SIGINT, closing the server..."
+        print("\nGot SIGINT, closing the server...")
 
     server.cr.broadcast("Shutting down...")
     server.cr.shutdown()
