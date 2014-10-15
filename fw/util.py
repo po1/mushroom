@@ -101,9 +101,3 @@ def myrepr(obj):
         return 'None'
     else:
         return '<{}>'.format(obj.__class__.__name__)
-
-
-def get_param(obj, addr):
-    if not addr:
-        return obj
-    return get_param(getattr(obj, addr[0]), addr[1:])

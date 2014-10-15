@@ -220,11 +220,12 @@ class MRPlayer(MRObject):
     def cmd_examine(self, player, rest):
         def doit(arg, rest):
             if rest:
-                arg_name = '.'.join([arg.name] + rest.split())
+                arg_name = '{}.{}'.format(arg.name, rest)
                 try:
-                    arg = util.get_param(arg, rest.split())
+                    # XXX: security (who cares?)
+                    arg = eval('arg.{}'.format(rest))
                 except AttributeError:
-                    self.send("{} has no attribute {}".format(arg.name, '.'.join(rest)))
+                    self.send("{} has no attribute {}".format(arg.name, rest))
                     return
             else:
                 arg_name = arg.name
@@ -242,7 +243,8 @@ class MRPlayer(MRObject):
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))
 
-        rest = ' '.join(rest.split('.'))
+        dots = rest.split('.')
+        rest = '{} {}'.format(dots[0], '.'.join(dots[1:]))
         util.find_and_do(player, rest, doit,
                          self.reachable_objects(),
                          short_names=util.player_snames(self),
