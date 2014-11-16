@@ -76,7 +76,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.silent = False
         self.op = False
 
-        print(("New client: " + ip))
+        print("New client: " + ip)
         self.wfile.write("Welcome!\n")
         for data in self.rfile:
             try:
@@ -86,7 +86,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 traceback.print_exc()
                 self.wfile.write("An error occured. Please reconnect...\n")
                 break
-        print(("Client disconnected: " + ip))
+        print("Client disconnected: " + ip)
         self.cl.on_disconnect()
         self.server.cr.delete(self.cl)
         if not self.silent:
@@ -121,7 +121,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return False
 
     def scmd_shutdown(self, rest):
-        print(("Shutdown request by " + self.cl.name))
+        print("Shutdown request by " + self.cl.name)
         self.server.running = False
         return True
 
