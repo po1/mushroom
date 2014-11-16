@@ -5,6 +5,8 @@
 import os
 import cmd
 import readline
+import socket
+import time
 
 class Console(cmd.Cmd):
 
@@ -15,6 +17,8 @@ class Console(cmd.Cmd):
                 "Welcome to the Mushroom client!\n"
                 "Connect to a server using the _connect command.\n"
                 "Help is available with the _help command.")
+        self.is_connected = 0
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     ## Command definitions ##
     def do__hist(self, args):
@@ -39,12 +43,23 @@ class Console(cmd.Cmd):
 
     def do_help(self, args):
         """In-game help"""
-        self.default(args)
+        self.default("help")
 
     def do__connect(self, args):
-        """Connects the given server
+        """Connects to the given server
            '_connect <server> <port>"""
-        print args
+        try:
+            server, port = args.split()
+            self.socket.connect((server, int(port)))
+            self.is_connected = 1
+            time.sleep(0.2)
+            print self.socket.recv(4096)
+        except ValueError:
+            print "Too many arguments."
+            print "Help for _connect:"
+            cmd.Cmd.do_help(self, "_connect")
+        except:
+            print "Unable to connect, check the parameters and try again."
 
     ## Override methods in Cmd object ##
     def preloop(self):
@@ -65,7 +80,7 @@ class Console(cmd.Cmd):
 
     def precmd(self, line):
         """ This method is called after the line has been input but before
-            it has been interpreted. If you want to modifdy the input line
+            it has been interpreted. If you want to modify the input line
             before execution (for example, variable substitution) do it here.
         """
         self._hist += [ line.strip() ]
@@ -85,10 +100,12 @@ class Console(cmd.Cmd):
         """Called on an input line when the command prefix is not recognized.
            In that case we execute the line as Python code.
         """
-        try:
-            exec(line) in self._locals, self._globals
-        except Exception, e:
-            print e.__class__, ":", e
+        if not self.is_connected:
+            print "The client is not connected. Please connect to a server using the '_connect' command."
+        else:
+            self.socket.send(line + "\n")
+            time.sleep(0.2)
+            print self.socket.recv(4096)
 
 if __name__ == '__main__':
         console = Console()
