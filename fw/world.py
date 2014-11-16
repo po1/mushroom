@@ -93,12 +93,12 @@ class MRPlayer(MRObject):
 
     fancy_name = "player"
     cmds = {
-            "look": "cmd_look",
-            "go": "cmd_go",
-            "describe": "cmd_describe",
-            "cmd": "cmd_cmd",
-            "destroy": "cmd_destroy",
-            "examine": "cmd_examine",
+            "look"     : "cmd_look",
+            "go"       : "cmd_go",
+            "describe" : "cmd_describe",
+            "cmd"      : "cmd_cmd",
+            "destroy"  : "cmd_destroy",
+            "examine"  : "cmd_examine",
     }
 
     def __init__(self, name):

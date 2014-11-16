@@ -12,11 +12,11 @@ class MRClient(BaseClient):
     """
 
     cmds = {
-            'chat': 'cmd_chat',
-            'name': 'cmd_name',
-            'help': 'cmd_help',
-            'create': 'cmd_create',
-            'play': 'cmd_play',
+            'chat'   : 'cmd_chat',
+            'name'   : 'cmd_name',
+            'help'   : 'cmd_help',
+            'create' : 'cmd_create',
+            'play'   : 'cmd_play',
     }
 
 
