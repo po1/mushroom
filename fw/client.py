@@ -12,11 +12,11 @@ class MRClient(BaseClient):
     """
 
     cmds = {
-            'chat'   : 'cmd_chat',
-            'name'   : 'cmd_name',
-            'help'   : 'cmd_help',
-            'create' : 'cmd_create',
-            'play'   : 'cmd_play',
+            'chat': 'cmd_chat',
+            'name': 'cmd_name',
+            'help': 'cmd_help',
+            'create': 'cmd_create',
+            'play': 'cmd_play',
     }
 
 
@@ -95,16 +95,16 @@ class MRClient(BaseClient):
             return r
 
         cmds = {}
-        for k, c in self.cmds.items():
+        for k, c in list(self.cmds.items()):
             cmds[k] = clientcmd(getattr(self, c))
         if self.player is not None:
-            for k, c in self.player.cmds.items():
+            for k, c in list(self.player.cmds.items()):
                 cmds[k] = getattr(self.player, c)
             for p in self.player.powers:
-                for k, c in p.cmdlist().items():
-                    cmds[k] = getattr(p, c).im_func
+                for k, c in list(p.cmdlist().items()):
+                    cmds[k] = getattr(p, c).__func__
             if self.player.room is not None:
-                for k, c in self.player.room.cmds.items():
+                for k, c in list(self.player.room.cmds.items()):
                     cmds[k] = getattr(self.player.room, c)
         return cmds
 
@@ -115,7 +115,7 @@ class MRClient(BaseClient):
         """
         cmds = self.available_cmds()
         words = data.split()
-        match = filter(lambda x:util.match_name(words[0], x), cmds.keys())
+        match = [x for x in list(cmds.keys()) if util.match_name(words[0], x)]
         if len(match) != 1:
             self.send("Huh?")
             return

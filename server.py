@@ -1,5 +1,5 @@
 import threading
-import SocketServer
+import socketserver
 import socket
 import string
 import traceback
@@ -36,7 +36,7 @@ class ClientRegister:
         return self.lastid
 
     def get_client(self, cid):
-        for c, i in self.idmap.iteritems():
+        for c, i in self.idmap.items():
             if i == cid:
                 return c
         return None
@@ -50,7 +50,7 @@ class ClientRegister:
         self.clients.remove(client)
 
 
-class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
+class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
     """
     Basic handler for TCP input
     Interfaces with the FW client class
@@ -76,7 +76,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.silent = False
         self.op = False
 
-        print("New client: " + ip)
+        print(("New client: " + ip))
         self.wfile.write("Welcome!\n")
         for data in self.rfile:
             try:
@@ -86,7 +86,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 traceback.print_exc()
                 self.wfile.write("An error occured. Please reconnect...\n")
                 break
-        print("Client disconnected: " + ip)
+        print(("Client disconnected: " + ip))
         self.cl.on_disconnect()
         self.server.cr.delete(self.cl)
         if not self.silent:
@@ -121,7 +121,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return False
 
     def scmd_shutdown(self, rest):
-        print("Shutdown request by " + self.cl.name)
+        print(("Shutdown request by " + self.cl.name))
         self.server.running = False
         return True
 
@@ -169,7 +169,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         return True
 
 
-class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
 if __name__ == "__main__":

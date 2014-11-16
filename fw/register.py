@@ -11,7 +11,7 @@ def get_class(name):
 
 
 def get_type(fancy_name):
-    for c in registry.itervalues():
+    for c in registry.values():
         if getattr(c, 'fancy_name', None) == fancy_name:
             return c
     return None
@@ -19,7 +19,7 @@ def get_type(fancy_name):
 
 def get_types():
     fn = []
-    for c in registry.itervalues():
+    for c in registry.values():
         f = getattr(c, 'fancy_name', None)
         if f is not None and f not in fn:
             fn.append(f)

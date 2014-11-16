@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 
 import types
 
@@ -7,15 +7,15 @@ from .register import get_type
 import sys
 
 member_types = (
-    types.BooleanType,
-    types.DictType,
-    types.FloatType,
-    types.IntType,
-    types.ListType,
-    types.NoneType,
-    types.StringType,
-    types.TupleType,
-    types.UnicodeType,
+    bool,
+    dict,
+    float,
+    int,
+    list,
+    type(None),
+    bytes,
+    tuple,
+    str,
 )
 
 def log_err(msg):
@@ -45,7 +45,7 @@ def match_name(short, name):
 
 
 def match_list(short, elts):
-    return filter(lambda x:match_name(short, x.name), elts)
+    return [x for x in elts if match_name(short, x.name)]
 
 
 def player_snames(player, allow_no_room=False):
@@ -83,20 +83,20 @@ def find_and_do(player, rest, dofun, search_list,
 
 
 def multiple_choice(choices):
-    names = map(lambda x:x.name, choices)
+    names = [x.name for x in choices]
     return "Which one?\nChoices are: " + ', '.join(names)
 
 
 def myrepr(obj):
     if type(obj) in (str, int, float, bool):
         return repr(obj)
-    elif type(obj) is list:
+    elif isinstance(obj, list):
         return '[{}]'.format(', '.join([myrepr(x) for x in obj]))
-    elif type(obj) is tuple:
+    elif isinstance(obj, tuple):
         return '({})'.format(', '.join([myrepr(x) for x in obj]))
-    elif type(obj) is dict:
+    elif isinstance(obj, dict):
         return '{{{}}}'.format(', '.join(['{}: {}'.format(myrepr(k), myrepr(v))
-                                            for k, v in obj.items()]))
+                                            for k, v in list(obj.items())]))
     elif obj is None:
         return 'None'
     else:

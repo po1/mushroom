@@ -64,7 +64,7 @@ class MRRoom(MRObject):
         self.emit(player.name + " says: " + rest)
 
     def cmd_emit(self, player, rest):
-        self.emit(rest.replace('\\n','\n').replace('\\t','\t'))
+        self.emit(rest.replace('\\n', '\n').replace('\\t', '\t'))
 
     def cmd_link(self, player, rest):
         def doit(arg, _):
@@ -93,12 +93,12 @@ class MRPlayer(MRObject):
 
     fancy_name = "player"
     cmds = {
-            "look"     : "cmd_look",
-            "go"       : "cmd_go",
-            "describe" : "cmd_describe",
-            "cmd"      : "cmd_cmd",
-            "destroy"  : "cmd_destroy",
-            "examine"  : "cmd_examine",
+            "look": "cmd_look",
+            "go": "cmd_go",
+            "describe": "cmd_describe",
+            "cmd": "cmd_cmd",
+            "destroy": "cmd_destroy",
+            "examine": "cmd_examine",
     }
 
     def __init__(self, name):
@@ -137,7 +137,7 @@ class MRPlayer(MRObject):
     def cmd_describe(self, player, rest):
         def doit(thing, _):
             thing.description = (' '.join(rest.split()[1:])
-                                 .replace('\\n','\n').replace('\\t','\t'))
+                                 .replace('\\n', '\n').replace('\\t', '\t'))
 
         self.find_doit(rest, doit, noarg="Describe what?")
 
@@ -148,7 +148,7 @@ class MRPlayer(MRObject):
                 return
             cmd = rest.split()[1]
             cmd_name = "cmd_" + cmd
-            cmd_txt = ' '.join(rest.split()[2:]).replace('\\n','\n').replace('\\t','\t')
+            cmd_txt = ' '.join(rest.split()[2:]).replace('\\n', '\n').replace('\\t', '\t')
             thing.add_cmd(cmd, cmd_name, cmd_txt)
 
         self.find_doit(rest, doit, noarg="Add a command to what?")
@@ -284,7 +284,7 @@ class MRArchi(MRPower):
     def cmd_exec(self, rest):
         try:
             genv, lenv = self._safe_env()
-            exec(rest.replace('\\n','\n').replace('\\t','\t'), genv, lenv)
+            exec(rest.replace('\\n', '\n').replace('\\t', '\t'), genv, lenv)
         except Exception as pbm:
             self.send(str(pbm))
 
