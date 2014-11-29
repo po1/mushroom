@@ -1,7 +1,6 @@
 import threading
-import SocketServer
+import socketserver
 import socket
-import string
 import traceback
 
 from config import MRConfig as cfg
@@ -36,7 +35,7 @@ class ClientRegister:
         return self.lastid
 
     def get_client(self, cid):
-        for c, i in self.idmap.iteritems():
+        for c, i in self.idmap.items():
             if i == cid:
                 return c
         return None
@@ -50,7 +49,7 @@ class ClientRegister:
         self.clients.remove(client)
 
 
-class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
+class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
     """
     Basic handler for TCP input
     Interfaces with the FW client class
@@ -77,14 +76,14 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.op = False
 
         print("New client: " + ip)
-        self.wfile.write("Welcome!\n")
+        self.wfile.write("Welcome!\n".encode("utf8"))
         for data in self.rfile:
             try:
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data);
             except Exception:
                 traceback.print_exc()
-                self.wfile.write("An error occured. Please reconnect...\n")
+                self.wfile.write("An error occured. Please reconnect...\n".encode("utf8"))
                 break
         print("Client disconnected: " + ip)
         self.cl.on_disconnect()
@@ -93,6 +92,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             self.server.cr.broadcast(self.cl.name + " has quit")
 
     def handle_scommands(self, data):
+        data = data.decode("utf8")
         op_command_prefix = cfg.op_command_prefix
         words = data.split()
         if len(words) < 1:
@@ -104,14 +104,14 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             return False
         if cmd in self.op_scmds and not self.op:
             return False
-        return getattr(self, self.scmds[cmd])(string.join(words[1:]))
+        return getattr(self, self.scmds[cmd])(" ".join(words[1:]))
 
     def scmd_help(self, rest):
-        self.wfile.write("List of available server commands:\n")
+        self.wfile.write("List of available server commands:\n".encode("utf8"))
         cmds = list(self.scmds.keys())
         if not self.op:
             cmds = [x for x in cmds if x not in self.op_scmds]
-        self.wfile.write("  {}\n".format(', '.join(cmds)))
+        self.wfile.write("  {}\n".format(', '.join(cmds)).encode("utf8"))
         return True
 
     def scmd_login(self, rest):
@@ -130,10 +130,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             cid = self.server.cr.idmap[c]
             try:
                 self.wfile.write("{}\t{}\t{}\n".format(cid, c.name,
-                    c.handler.request.getpeername()[0]))
+                    c.handler.request.getpeername()[0]).encode("utf8"))
             except socket.error:
                 traceback.print_exc()
-                self.wfile.write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
+                self.wfile.write("{}\t{}\tSOCK_ERR\n".format(cid, c.name).encode("utf8"))
         return True
 
     def scmd_save(self, rest):
@@ -144,9 +144,9 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         try:
             Database.load(cfg.db_file)
         except IOError:
-            self.wfile.write("Could not load: database not found.\n")
+            self.wfile.write("Could not load: database not found.\n".encode("utf8"))
         except Exception:
-            self.wfile.write("Load failed. Check server log.\n")
+            self.wfile.write("Load failed. Check server log.\n".encode("utf8"))
             traceback.print_exc()
         return True
 
@@ -154,22 +154,22 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         try:
             cid = int(rest)
         except ValueError:
-            self.wfile.write("Error: not a valid id\n")
+            self.wfile.write("Error: not a valid id\n".encode("utf8"))
         else:
             clnt = self.server.cr.get_client(cid)
             if clnt is not None:
                 req = clnt.handler.wfile
-                req.write("You have been kicked! (ouch...)\n")
+                req.write("You have been kicked! (ouch...)\n".encode("utf8"))
                 clnt.handler.silent = True
                 clnt.handler.request.shutdown(socket.SHUT_RD)
                 self.server.cr.broadcast_except(clnt, clnt.name +
                     " has been kicked!")
             else:
-                self.wfile.write("Error: not a valid id\n")
+                self.wfile.write("Error: not a valid id\n".encode("utf8"))
         return True
 
 
-class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
 if __name__ == "__main__":
