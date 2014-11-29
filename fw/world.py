@@ -79,6 +79,7 @@ class MRRoom(MRObject):
             self.exits.remove(arg)
 
         util.find_and_do(player, rest, doit,
+                         self.exits,
                          noarg="Unlink what?",
                          notfound="This room ain't connected to Canada.",
                          )
