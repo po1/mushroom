@@ -132,7 +132,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         for c in self.server.cr.clients:
             cid = self.server.cr.idmap[c]
             try:
-                self.handler_write("{}\t{}\t{}\n".format(cid, c.name, c.handler.request.getpeername()[0]))
+                self.handler_write("{}\t{}\t{}\n".format(cid, c.name,
+                    c.handler.request.getpeername()[0]))
             except socket.error:
                 traceback.print_exc()
                 self.handler_write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
@@ -163,7 +164,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 clnt.handler.handler_write("You have been kicked! (ouch...)\n")
                 clnt.handler.silent = True
                 clnt.handler.request.shutdown(socket.SHUT_RD)
-                self.server.cr.broadcast_except(clnt, clnt.name + " has been kicked!")
+                self.server.cr.broadcast_except(clnt,
+                        clnt.name + " has been kicked!")
             else:
                 self.handler_write("Error: not a valid id\n")
         return True
