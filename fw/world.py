@@ -69,6 +69,7 @@ class MRRoom(MRObject):
     def cmd_link(self, player, rest):
         def doit(arg, _):
             self.exits.append(arg)
+            self.emit("Linked {} and {}".format(arg.name, self.name))
 
         util.find_and_do(player, rest, doit,
                          db.list_all(MRRoom),
@@ -77,6 +78,7 @@ class MRRoom(MRObject):
     def cmd_unlink(self, player, rest):
         def doit(arg, _):
             self.exits.remove(arg)
+            self.emit("Unlinked {} and {}".format(arg.name, self.name))
 
         util.find_and_do(player, rest, doit,
                          self.exits,
@@ -138,7 +140,8 @@ class MRPlayer(MRObject):
     def cmd_describe(self, player, rest):
         def doit(thing, _):
             thing.description = (' '.join(rest.split()[1:])
-                                 .replace('\\n', '\n').replace('\\t', '\t'))
+                    .replace('\\n', '\n').replace('\\t', '\t'))
+            self.send("Added description of {}".format(thing.name))
 
         self.find_doit(rest, doit, noarg="Describe what?")
 
@@ -149,8 +152,10 @@ class MRPlayer(MRObject):
                 return
             cmd = rest.split()[1]
             cmd_name = "cmd_" + cmd
-            cmd_txt = ' '.join(rest.split()[2:]).replace('\\n', '\n').replace('\\t', '\t')
+            cmd_txt = (' '.join(rest.split()[2:])
+                    .replace('\\n', '\n').replace('\\t', '\t'))
             thing.add_cmd(cmd, cmd_name, cmd_txt)
+            self.send("Added command {} to {}".format(cmd_name, thing.name))
 
         self.find_doit(rest, doit, noarg="Add a command to what?")
 
