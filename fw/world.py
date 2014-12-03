@@ -1,6 +1,6 @@
 from . import util
-from . import db
 
+from .db import db
 from .interface import BaseObject
 from .register import register
 
@@ -191,7 +191,7 @@ class MRPlayer(MRObject):
                     self.room.emit(player.name + " violently destroyed " +
                                    thing.name + "!")
                     self.room.contents.remove(thing)
-            db.objects.remove(thing)
+            db.remove(thing)
             if util.is_player(thing):
                 if thing.client is not None:
                     thing.client.player = None
