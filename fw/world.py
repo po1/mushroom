@@ -182,12 +182,14 @@ class MRPlayer(MRObject):
     def cmd_destroy(self, player, rest):
         def doit(thing, _):
             if self.room is not None:
-                self.room.emit(self.name + " violently destroyed " + thing.name + "!")
                 if util.is_room(thing):
+                    self.room.emit(player.name + " blew up the place!")
                     self.room.emit("You fall into the void of nothingness.")
                     for p in filter(util.is_player, thing.contents):
                         p.room = None
                 else:
+                    self.room.emit(player.name + " violently destroyed " +
+                                   thing.name + "!")
                     self.room.contents.remove(thing)
             db.objects.remove(thing)
             if util.is_player(thing):
@@ -253,7 +255,6 @@ class MRPlayer(MRObject):
                     continue
                 internals[attr] = util.myrepr(attr_val)
             if internals:
-                self.send("Internals:")
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))
 
