@@ -227,9 +227,10 @@ class MRPlayer(MRObject):
         def doit(arg, rest):
             if rest:
                 arg_name = '{}.{}'.format(arg.name, rest)
+                arg_cmd = 'arg.{}'.format(rest) if rest.strip() else 'arg'
                 try:
                     # XXX: security (who cares?)
-                    arg = eval('arg.{}'.format(rest))
+                    arg = eval(arg_cmd)
                 except AttributeError:
                     self.send("{} has no attribute {}".format(arg.name, rest))
                     return
