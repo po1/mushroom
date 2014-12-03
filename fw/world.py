@@ -38,7 +38,7 @@ class MRRoom(MRObject):
     """
 
     fancy_name = "room"
-    cmds = {
+    fw_cmds = {
             "say"    : "cmd_say",
             "emit"   : "cmd_emit",
             "link"   : "cmd_link",
@@ -95,7 +95,7 @@ class MRPlayer(MRObject):
     """
 
     fancy_name = "player"
-    cmds = {
+    fw_cmds = {
             "look"     : "cmd_look",
             "go"       : "cmd_go",
             "describe" : "cmd_describe",
@@ -260,11 +260,11 @@ class MRPlayer(MRObject):
 
 @register
 class MRPower(object):
-    cmds = {}
+    fw_cmds = {}
 
     @classmethod
     def cmdlist(cls):
-        a = cls.cmds
+        a = cls.fw_cmds
         for c in cls.__bases__:
             if issubclass(c, MRPower) and c is not MRPower:
                 a.update(c.cmdlist())
@@ -278,8 +278,10 @@ class MRArchi(MRPower):
     Has extended powers
     """
 
-    cmds = {'eval':'cmd_eval',
-            'exec':'cmd_exec'}
+    fw_cmds = {
+        'eval':'cmd_eval',
+        'exec':'cmd_exec',
+    }
 
     def cmd_eval(self, rest):
         try:

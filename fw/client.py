@@ -11,7 +11,7 @@ class MRClient(BaseClient):
     between the FW and the server.
     """
 
-    cmds = {
+    fw_cmds = {
             'chat'   : 'cmd_chat',
             'name'   : 'cmd_name',
             'help'   : 'cmd_help',
