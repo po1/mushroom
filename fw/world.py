@@ -154,8 +154,11 @@ class MRPlayer(MRObject):
             cmd_name = "cmd_" + cmd
             cmd_txt = (' '.join(rest.split()[2:])
                     .replace('\\n', '\n').replace('\\t', '\t'))
-            thing.add_cmd(cmd, cmd_name, cmd_txt)
-            self.send("Added command {} to {}".format(cmd_name, thing.name))
+            try:
+                thing.add_cmd(cmd, cmd_name, cmd_txt)
+                self.send("Added command {} to {}".format(cmd_name, thing.name))
+            except Exception:
+                self.send("Something went wrong when adding the command.")
 
         self.find_doit(rest, doit, noarg="Add a command to what?")
 
@@ -233,6 +236,10 @@ class MRPlayer(MRObject):
                     arg = eval(arg_cmd)
                 except AttributeError:
                     self.send("{} has no attribute {}".format(arg.name, rest))
+                    return
+                except Exception:
+                    self.send("I don't know what just happened, "
+                              "but don't do that again.")
                     return
             else:
                 arg_name = arg.name
