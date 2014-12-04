@@ -1,7 +1,3 @@
-
-
-import types
-
 from .register import get_type
 
 import sys

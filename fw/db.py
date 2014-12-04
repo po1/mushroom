@@ -12,6 +12,8 @@ class Database:
         self.last_id = 0
 
     def add(self, obj):
+        if not isinstance(obj, BaseObject):
+            raise Exception("Trying to add random trash to the DB!")
         self.objects[self.last_id] = obj
         self.ids[obj] = self.last_id
         self.last_id += 1
@@ -44,7 +46,7 @@ class Database:
 
     def search(self, name, type=BaseObject):
         found = []
-        for tid, thing in self.objects.items():
+        for thing in self.objects.values():
             if util.match_name(name, thing.name):
                 if isinstance(thing, type):
                     found.append(thing)
