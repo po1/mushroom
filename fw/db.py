@@ -8,33 +8,35 @@ from .interface import BaseObject
 class Database:
     def __init__(self):
         self.objects = {}
+        self.ids = {}  # use a reverse map
         self.last_id = 0
 
     def add(self, obj):
         self.objects[self.last_id] = obj
+        self.ids[obj] = self.last_id
         self.last_id += 1
 
-    def remove(self, obj_id):
-        if type(obj_id) is not int:
-            obj_id = self.get_id(obj_id)
-        del self.objects[obj_id]
+    def remove(self, obj):
+        if type(obj) is int:
+            del self.ids[self.objects[obj]]
+            del self.objects[obj]
+        else:
+            del self.objects[self.ids[obj]]
+            del self.ids[obj]
 
     def get(self, obj_id):
         return self.objects.get(obj_id, None)
 
-    # slow, do not use
     def get_id(self, obj):
-        for i, o in self.objects.items():
-            if o is obj:
-                return i
-        raise Exception("Object '{}' <{}> not in the database"
-                .format(obj.name, obj.__class__.__name__))
+        return self.ids[obj]
 
     def load(self, db_file):
         with open(db_file, 'rb') as f:
             self.objects = pickle.load(f)
             if self.objects:
                 self.last_id = max(self.objects.keys()) + 1
+                for k, v in self.objects.items():
+                    self.ids[v] = k
 
     def dump(self, db_file):
         with open(db_file, 'wb') as f:
