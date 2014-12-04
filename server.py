@@ -68,6 +68,9 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
              'load':'scmd_load'}
     op_scmds = ['users', 'kick', 'save', 'load', 'shutdown']
 
+    def handler_write(self, msg):
+        self.wfile.write(msg.encode("utf8"))
+
     def handle(self):
         ip = self.request.getpeername()[0]
         self.cl = Client(self, ip)
@@ -76,14 +79,15 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.op = False
 
         print("New client: " + ip)
-        self.wfile.write("Welcome!\n".encode("utf8"))
+        self.handler_write("Welcome!\n")
         for data in self.rfile:
             try:
+                data = data.decode("utf8")
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data);
             except Exception:
                 traceback.print_exc()
-                self.wfile.write("An error occured. Please reconnect...\n".encode("utf8"))
+                self.handler_write("An error occured. Please reconnect...\n")
                 break
         print("Client disconnected: " + ip)
         self.cl.on_disconnect()
@@ -92,7 +96,6 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
             self.server.cr.broadcast(self.cl.name + " has quit")
 
     def handle_scommands(self, data):
-        data = data.decode("utf8")
         op_command_prefix = cfg.op_command_prefix
         words = data.split()
         if len(words) < 1:
@@ -107,11 +110,11 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return getattr(self, self.scmds[cmd])(" ".join(words[1:]))
 
     def scmd_help(self, rest):
-        self.wfile.write("List of available server commands:\n".encode("utf8"))
+        self.handler_write("List of available server commands:\n")
         cmds = list(self.scmds.keys())
         if not self.op:
             cmds = [x for x in cmds if x not in self.op_scmds]
-        self.wfile.write("  {}\n".format(', '.join(cmds)).encode("utf8"))
+        self.handler_write("  {}\n".format(', '.join(cmds)))
         return True
 
     def scmd_login(self, rest):
@@ -129,11 +132,11 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         for c in self.server.cr.clients:
             cid = self.server.cr.idmap[c]
             try:
-                self.wfile.write("{}\t{}\t{}\n".format(cid, c.name,
-                    c.handler.request.getpeername()[0]).encode("utf8"))
+                self.handler_write("{}\t{}\t{}\n".format(cid, c.name,
+                    c.handler.request.getpeername()[0]))
             except socket.error:
                 traceback.print_exc()
-                self.wfile.write("{}\t{}\tSOCK_ERR\n".format(cid, c.name).encode("utf8"))
+                self.handler_write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
         return True
 
     def scmd_save(self, rest):
@@ -144,9 +147,9 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         try:
             Database.load(cfg.db_file)
         except IOError:
-            self.wfile.write("Could not load: database not found.\n".encode("utf8"))
+            self.handler_write("Could not load: database not found.\n")
         except Exception:
-            self.wfile.write("Load failed. Check server log.\n".encode("utf8"))
+            self.handler_write("Load failed. Check server log.\n")
             traceback.print_exc()
         return True
 
@@ -154,18 +157,17 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         try:
             cid = int(rest)
         except ValueError:
-            self.wfile.write("Error: not a valid id\n".encode("utf8"))
+            self.handler_write("Error: not a valid id\n")
         else:
             clnt = self.server.cr.get_client(cid)
             if clnt is not None:
-                req = clnt.handler.wfile
-                req.write("You have been kicked! (ouch...)\n".encode("utf8"))
+                clnt.handler.handler_write("You have been kicked! (ouch...)\n")
                 clnt.handler.silent = True
                 clnt.handler.request.shutdown(socket.SHUT_RD)
-                self.server.cr.broadcast_except(clnt, clnt.name +
-                    " has been kicked!")
+                self.server.cr.broadcast_except(clnt,
+                        clnt.name + " has been kicked!")
             else:
-                self.wfile.write("Error: not a valid id\n".encode("utf8"))
+                self.handler_write("Error: not a valid id\n")
         return True
 
 

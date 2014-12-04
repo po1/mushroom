@@ -11,7 +11,7 @@ class BaseClient:
 
     def send(self, msg):
         try:
-            self.handler.wfile.write((msg + "\n").encode("utf8"))
+            self.handler.handler_write((msg + "\n"))
         except IOError:
             log_err("Could not send to " + self.name)
 
