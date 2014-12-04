@@ -245,7 +245,7 @@ class MRPlayer(MRObject):
                     return
             else:
                 arg_name = arg.name
-            self.send('{}: {}'.format(arg_name, util.myrepr(arg)))
+            self.send('{}: {}'.format(arg_name, util.myrepr(arg, db)))
             internals = {}
             for attr in dir(arg):
                 if attr[0] == '_':
@@ -253,7 +253,7 @@ class MRPlayer(MRObject):
                 attr_val = getattr(arg, attr)
                 if not isinstance(attr_val, util.member_types + (BaseObject,)):
                     continue
-                internals[attr] = util.myrepr(attr_val)
+                internals[attr] = util.myrepr(attr_val, db)
             if internals:
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))

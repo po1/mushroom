@@ -83,17 +83,24 @@ def multiple_choice(choices):
     return "Which one?\nChoices are: " + ', '.join(names)
 
 
-def myrepr(obj):
+def myrepr(obj, db=None):
     if type(obj) in (str, int, float, bool):
         return repr(obj)
     elif isinstance(obj, list):
-        return '[{}]'.format(', '.join([myrepr(x) for x in obj]))
+        return '[{}]'.format(', '.join([myrepr(x, db) for x in obj]))
     elif isinstance(obj, tuple):
-        return '({})'.format(', '.join([myrepr(x) for x in obj]))
+        return '({})'.format(', '.join([myrepr(x, db) for x in obj]))
     elif isinstance(obj, dict):
-        return '{{{}}}'.format(', '.join(['{}: {}'.format(myrepr(k), myrepr(v))
+        return '{{{}}}'.format(', '.join(['{}: {}'.format(myrepr(k, db),
+                                                          myrepr(v, db))
                                             for k, v in list(obj.items())]))
     elif obj is None:
         return 'None'
     else:
-        return '<{}>'.format(obj.__class__.__name__)
+        ret = '<{}>'.format(obj.__class__.__name__)
+        if db is not None:
+            try:
+                ret += '#{}'.format(db.get_id(obj))
+            except Exception:
+                pass
+        return ret
