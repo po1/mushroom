@@ -1,7 +1,7 @@
 from . import client
-from . import db
 from . import world
 
+from .db import db
 from .register import get_class
 from .register import get_type
 

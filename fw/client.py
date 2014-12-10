@@ -1,8 +1,8 @@
 from . import util
-from . import db
 
-from .register import get_type
+from .db import db
 from .interface import BaseClient
+from .register import get_type
 
 
 class MRClient(BaseClient):
@@ -64,7 +64,7 @@ class MRClient(BaseClient):
                 self.send("Uhm... something by that name already exists...")
                 return
             thing = cls(' '.join(words[1:]))
-            db.objects.append(thing)
+            db.add(thing)
             self.send("{} '{}' has been created".format(cls.fancy_name,
                 ' '.join(words[1:])))
             if util.is_thing(thing) and self.player is not None:

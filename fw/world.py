@@ -1,6 +1,6 @@
 from . import util
-from . import db
 
+from .db import db
 from .interface import BaseObject
 from .register import register
 
@@ -191,7 +191,7 @@ class MRPlayer(MRObject):
                     self.room.emit(player.name + " violently destroyed " +
                                    thing.name + "!")
                     self.room.contents.remove(thing)
-            db.objects.remove(thing)
+            db.remove(thing)
             if util.is_player(thing):
                 if thing.client is not None:
                     thing.client.player = None
@@ -245,7 +245,7 @@ class MRPlayer(MRObject):
                     return
             else:
                 arg_name = arg.name
-            self.send('{}: {}'.format(arg_name, util.myrepr(arg)))
+            self.send('{}: {}'.format(arg_name, util.myrepr(arg, db)))
             internals = {}
             for attr in dir(arg):
                 if attr[0] == '_':
@@ -253,7 +253,7 @@ class MRPlayer(MRObject):
                 attr_val = getattr(arg, attr)
                 if not isinstance(attr_val, util.member_types + (BaseObject,)):
                     continue
-                internals[attr] = util.myrepr(attr_val)
+                internals[attr] = util.myrepr(attr_val, db)
             if internals:
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))
