@@ -11,7 +11,19 @@ class BaseClient:
     def __init__(self, handler, name):
         self.handler = handler
         self.name = name
-        self.cmds = self.fw_cmds.copy()
+        self.cmds = {}
+        for k, v in self.fw_cmds.items():
+            self.add_cmd(k, v())
+
+    def add_cmd(self, name, command):
+        self.cmds[name] = command
+
+    def remove_cmd(self, command):
+        if type(command) is str and command in self.cmds:
+            del self.cmds[command]
+        else:
+            for k in [x for x in self.cmds if self.cmds[x] == command]:
+                del self.cmds[k]
 
     def send(self, msg):
         try:
