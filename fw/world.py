@@ -38,7 +38,7 @@ class MRRoom(MRObject):
     """
 
     fancy_name = "room"
-    cmds = {
+    fw_cmds = {
             "say"    : "cmd_say",
             "emit"   : "cmd_emit",
             "link"   : "cmd_link",
@@ -95,7 +95,7 @@ class MRPlayer(MRObject):
     """
 
     fancy_name = "player"
-    cmds = {
+    fw_cmds = {
             "look"     : "cmd_look",
             "go"       : "cmd_go",
             "describe" : "cmd_describe",
@@ -154,8 +154,11 @@ class MRPlayer(MRObject):
             cmd_name = "cmd_" + cmd
             cmd_txt = (' '.join(rest.split()[2:])
                     .replace('\\n', '\n').replace('\\t', '\t'))
-            thing.add_cmd(cmd, cmd_name, cmd_txt)
-            self.send("Added command {} to {}".format(cmd_name, thing.name))
+            try:
+                thing.add_cmd(cmd, cmd_name, cmd_txt)
+                self.send("Added command {} to {}".format(cmd_name, thing.name))
+            except Exception:
+                self.send("Something went wrong when adding the command.")
 
         self.find_doit(rest, doit, noarg="Add a command to what?")
 
@@ -179,12 +182,14 @@ class MRPlayer(MRObject):
     def cmd_destroy(self, player, rest):
         def doit(thing, _):
             if self.room is not None:
-                self.room.emit(self.name + " violently destroyed " + thing.name + "!")
                 if util.is_room(thing):
+                    self.room.emit(player.name + " blew up the place!")
                     self.room.emit("You fall into the void of nothingness.")
                     for p in filter(util.is_player, thing.contents):
                         p.room = None
                 else:
+                    self.room.emit(player.name + " violently destroyed " +
+                                   thing.name + "!")
                     self.room.contents.remove(thing)
             db.objects.remove(thing)
             if util.is_player(thing):
@@ -227,11 +232,16 @@ class MRPlayer(MRObject):
         def doit(arg, rest):
             if rest:
                 arg_name = '{}.{}'.format(arg.name, rest)
+                arg_cmd = 'arg.{}'.format(rest) if rest.strip() else 'arg'
                 try:
                     # XXX: security (who cares?)
-                    arg = eval('arg.{}'.format(rest))
+                    arg = eval(arg_cmd)
                 except AttributeError:
                     self.send("{} has no attribute {}".format(arg.name, rest))
+                    return
+                except Exception:
+                    self.send("I don't know what just happened, "
+                              "but don't do that again.")
                     return
             else:
                 arg_name = arg.name
@@ -245,7 +255,6 @@ class MRPlayer(MRObject):
                     continue
                 internals[attr] = util.myrepr(attr_val)
             if internals:
-                self.send("Internals:")
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))
 
@@ -259,11 +268,11 @@ class MRPlayer(MRObject):
 
 @register
 class MRPower(object):
-    cmds = {}
+    fw_cmds = {}
 
     @classmethod
     def cmdlist(cls):
-        a = cls.cmds
+        a = cls.fw_cmds
         for c in cls.__bases__:
             if issubclass(c, MRPower) and c is not MRPower:
                 a.update(c.cmdlist())
@@ -277,8 +286,10 @@ class MRArchi(MRPower):
     Has extended powers
     """
 
-    cmds = {'eval':'cmd_eval',
-            'exec':'cmd_exec'}
+    fw_cmds = {
+        'eval':'cmd_eval',
+        'exec':'cmd_exec',
+    }
 
     def cmd_eval(self, rest):
         try:

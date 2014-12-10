@@ -5,9 +5,13 @@ class BaseClient:
     """
     Base class for MUSHRoom clients
     """
+
+    fw_cmds = {}
+
     def __init__(self, handler, name):
         self.handler = handler
         self.name = name
+        self.cmds = self.fw_cmds.copy()
 
     def send(self, msg):
         try:
@@ -29,11 +33,12 @@ class BaseObject(object):
     """
 
     fancy_name = "object"
-    cmds = {}
+    fw_cmds = {}
 
     def __init__(self, name):
         self.name = name
         self.custom_cmds = {}
+        self.cmds = self.fw_cmds.copy()
 
     def __getstate__(self):
         odict = self.__dict__.copy()
