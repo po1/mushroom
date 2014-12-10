@@ -34,6 +34,7 @@ class MRClient(BaseClient):
             self.send("Again?")
         else:
             self.name = words[0]
+            self.send("Your name is now {}".format(self.name))
 
     def cmd_help(self, rest):
         if not rest:
@@ -64,6 +65,8 @@ class MRClient(BaseClient):
                 return
             thing = cls(' '.join(words[1:]))
             db.objects.append(thing)
+            self.send("{} '{}' has been created".format(cls.fancy_name,
+                ' '.join(words[1:])))
             if util.is_thing(thing) and self.player is not None:
                 if self.player.room is not None:
                     self.player.room.contents.append(thing)
@@ -74,6 +77,7 @@ class MRClient(BaseClient):
                 self.player.client = None
             self.player = arg
             arg.client = self
+            self.send("You are now playing as {}".format(arg.name))
 
         util.find_and_do(self, rest, doit,
                          db.list_all(get_type('player')),

@@ -120,15 +120,18 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
     def scmd_login(self, rest):
         if rest == cfg.op_password:
             self.op = True
+            self.handler_write("Successflly logged as operator\n")
             return True
         return False
 
     def scmd_shutdown(self, rest):
         print("Shutdown request by " + self.cl.name)
+        self.handler_write("Shutting down\n")
         self.server.running = False
         return True
 
     def scmd_users(self, rest):
+        self.handler_write("Users listing:\n")
         for c in self.server.cr.clients:
             cid = self.server.cr.idmap[c]
             try:
@@ -141,11 +144,13 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
 
     def scmd_save(self, rest):
         Database.dump(cfg.db_file)
+        self.handler_write("Database saved\n")
         return True
 
     def scmd_load(self, rest):
         try:
             Database.load(cfg.db_file)
+            self.handler_write("Database loaded\n")
         except IOError:
             self.handler_write("Could not load: database not found.\n")
         except Exception:
