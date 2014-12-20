@@ -1,8 +1,11 @@
 from . import util
 
-from .db import db
 from .interface import BaseClient
 from .register import get_type
+
+from .commands import HelpCommand
+from .commands import PlayCommand
+from .commands import WrapperCommand
 
 
 class MRClient(BaseClient):
@@ -12,11 +15,8 @@ class MRClient(BaseClient):
     """
 
     fw_cmds = {
-            'chat'   : 'cmd_chat',
-            'name'   : 'cmd_name',
-            'help'   : 'cmd_help',
-            'create' : 'cmd_create',
-            'play'   : 'cmd_play',
+            'help'   : HelpCommand,
+            'play'   : PlayCommand,
     }
 
 
@@ -24,92 +24,35 @@ class MRClient(BaseClient):
         BaseClient.__init__(self, handler, name)
         self.player = None
 
-    def cmd_chat(self, rest):
-        self.handler.server.cr.broadcast("[global] {} says:"
-                "{}".format(self.name, rest))
-
-    def cmd_name(self, rest):
-        words = rest.split()
-        if len(words) < 1:
-            self.send("Again?")
-        else:
-            self.name = words[0]
-            self.send("Your name is now {}".format(self.name))
-
-    def cmd_help(self, rest):
-        if not rest:
-            self.send("Contextual commands:")
-            self.send("  {}".format(', '.join(sorted(self.available_cmds()))))
-        return
-        # TODO: add help topics for each command
-        self.send("chat <text>           global chat\n"
-                  "name <name>           change your client name\n"
-                  "exec <command>        execute python command\n"
-                  "eval <expression>     evaluate python expression\n"
-                  "create <type> <name>  thing, player, or room\n"
-                  "play <name>           go in the shoes of a player\n"
-                  "go <place>            move to a room\n"
-                  "look                  in a room, look around")
-
-    def cmd_create(self, rest):
-        words = rest.split()
-        if len(words) < 2:
-            self.send("Cannot create a nameless thing...")
-            return
-        cls = get_type(words[0])
-        if cls is None:
-            self.send("Create a what?")
-        else:
-            if len(db.search(words[1])) > 0:
-                self.send("Uhm... something by that name already exists...")
-                return
-            thing = cls(' '.join(words[1:]))
-            db.add(thing)
-            self.send("{} '{}' has been created".format(cls.fancy_name,
-                ' '.join(words[1:])))
-            if util.is_thing(thing) and self.player is not None:
-                if self.player.room is not None:
-                    self.player.room.contents.append(thing)
-
-    def cmd_play(self, rest):
-        def doit(arg, _):
-            if self.player is not None:
-                self.player.client = None
-            self.player = arg
-            arg.client = self
-            self.send("You are now playing as {}".format(arg.name))
-
-        util.find_and_do(self, rest, doit,
-                         db.list_all(get_type('player')),
-                         short_names=[],
-                         noarg="Play who?",
-                         notfound="Couldn't find the guy.")
-
     def available_cmds(self):
         """
         Looks for commands in (in this order):
         - client
         - player
         - room
+        - room contents
         """
 
-        def clientcmd(fun):
-            def r(pl, rest):
-                return fun(rest)
-            return r
+        def add_cmds(cmds, obj):
+            for k, v in obj.cmds.items():
+                cmds[k] = WrapperCommand(getattr(obj, v, None), self.player)
 
-        cmds = {}
-        for k, c in list(self.cmds.items()):
-            cmds[k] = clientcmd(getattr(self, c))
-        if self.player is not None:
-            for k, c in list(self.player.cmds.items()):
-                cmds[k] = getattr(self.player, c)
+        def add_power_cmds(cmds, power):
+            for k, v in power.fw_cmds.items():
+                cmd = getattr(power.__class__, v).__get__(self.player,
+                                                          get_type('player'))
+                cmds[k] = WrapperCommand(lambda _, x: cmd(x))
+
+        cmds = self.cmds.copy()
+        if self.player:
+            add_cmds(cmds, self.player)
             for p in self.player.powers:
-                for k, c in list(p.cmdlist().items()):
-                    cmds[k] = getattr(p, c).__func__
-            if self.player.room is not None:
-                for k, c in list(self.player.room.cmds.items()):
-                    cmds[k] = getattr(self.player.room, c)
+                add_power_cmds(cmds, p)
+            if self.player.room:
+                add_cmds(cmds, self.player.room)
+                for o in self.player.room.contents:
+                    if isinstance(o, get_type('thing')):
+                        add_cmds(cmds, o)
         return cmds
 
 
@@ -124,7 +67,7 @@ class MRClient(BaseClient):
             self.send("Huh?")
             return
         cmd = cmds[match[0]]
-        cmd(self.player, ' '.join(words[1:]))
+        cmd.call(self, words[0], ' '.join(words[1:]))
 
     def on_disconnect(self):
         if self.player is not None:
