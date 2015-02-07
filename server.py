@@ -82,8 +82,10 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         try:
             f = open(cfg.motd_file, 'r')
             self.handler_write(f.read())
-        except:
+        except OSError:
             self.handler_write("Welcome!\n")
+        finally:
+            f.close()
         for data in self.rfile:
             try:
                 data = data.decode("utf8")
