@@ -130,9 +130,9 @@ class RWLock:
 
         def __enter__(self):
             if self.write:
-                self.rwlock.aquire_w()
+                self.rwlock.acquire_w()
             else:
-                self.rwlock.aquire_r()
+                self.rwlock.acquire_r()
 
         def __exit__(self, exc_t, exc_v, trace):
             self.rwlock.release()
@@ -148,7 +148,7 @@ class RWLock:
         self.r = RWLock.Selector(self, write=False)
         self.w = RWLock.Selector(self, write=True)
 
-    def aquire_r(self):
+    def acquire_r(self):
         with self.lock:
             while self.readers < 0 or self.writers:
                 self.r_cv.wait()
