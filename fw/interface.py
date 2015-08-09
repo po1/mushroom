@@ -73,9 +73,12 @@ class BaseObject(object):
         self.cmds[cmd] = cmd_name
         locs = locals()
         locs[self.__class__.__name__] = self.__class__
-        txt = cmd_txt.replace('\n', '\n\t')
+        txt = cmd_txt.replace('\n', '\n\t\t')
         txt = ("def ___tmp(self, who, rest):\n"
-               "\t{}\n\n"
+               "\ttry:\n"
+               "\t\t{}\n"
+               "\texcept Exception as e:\n"
+               "\t\twho.send('woops: {{}}'.format(e))\n\n"
                "self.{} = ___tmp.__get__(self, {})"
                .format(txt, cmd_name, self.__class__.__name__))
         exec(txt, globals(), locs)
