@@ -1,0 +1,8 @@
+Welcome to Mushroom!
+
+To start playing, use the 'play' command:
+'play <name>'
+If this is your first time and the '<name>' character does not exist, you will be prompted to create it.
+
+At any time, the 'help' command will tell you what commands can be used and what for.
+
