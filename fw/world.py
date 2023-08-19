@@ -12,6 +12,7 @@ class MRObject(BaseObject):
     Every object belonging to the world
     must inherit from this class
     """
+
     pass
 
 
@@ -39,10 +40,10 @@ class MRRoom(MRObject):
 
     fancy_name = "room"
     fw_cmds = {
-            "say"    : "cmd_say",
-            "emit"   : "cmd_emit",
-            "link"   : "cmd_link",
-            "unlink" : "cmd_unlink"
+        "say": "cmd_say",
+        "emit": "cmd_emit",
+        "link": "cmd_link",
+        "unlink": "cmd_unlink",
     }
 
     def __init__(self, name):
@@ -64,27 +65,34 @@ class MRRoom(MRObject):
         self.emit(player.name + " says: " + rest)
 
     def cmd_emit(self, player, rest):
-        self.emit(rest.replace('\\n', '\n').replace('\\t', '\t'))
+        self.emit(rest.replace("\\n", "\n").replace("\\t", "\t"))
 
     def cmd_link(self, player, rest):
         def doit(arg, _):
             self.exits.append(arg)
             self.emit("Linked {} and {}".format(arg.name, self.name))
 
-        util.find_and_do(player, rest, doit,
-                         db.list_all(MRRoom),
-                         notfound="Don't know this place. Is it in Canada?")
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            db.list_all(MRRoom),
+            notfound="Don't know this place. Is it in Canada?",
+        )
 
     def cmd_unlink(self, player, rest):
         def doit(arg, _):
             self.exits.remove(arg)
             self.emit("Unlinked {} and {}".format(arg.name, self.name))
 
-        util.find_and_do(player, rest, doit,
-                         self.exits,
-                         noarg="Unlink what?",
-                         notfound="This room ain't connected to Canada.",
-                         )
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            self.exits,
+            noarg="Unlink what?",
+            notfound="This room ain't connected to Canada.",
+        )
 
 
 @register
@@ -96,12 +104,11 @@ class MRPlayer(MRObject):
 
     fancy_name = "player"
     fw_cmds = {
-            "look"     : "cmd_look",
-            "go"       : "cmd_go",
-            "describe" : "cmd_describe",
-            "cmd"      : "cmd_cmd",
-            "destroy"  : "cmd_destroy",
-            "examine"  : "cmd_examine",
+        "look": "cmd_look",
+        "go": "cmd_go",
+        "describe": "cmd_describe",
+        "cmd": "cmd_cmd",
+        "examine": "cmd_examine",
     }
 
     def __init__(self, name):
@@ -113,7 +120,7 @@ class MRPlayer(MRObject):
 
     def __getstate__(self):
         odict = super(MRPlayer, self).__getstate__()
-        del odict['client']
+        del odict["client"]
         return odict
 
     def __setstate__(self, dict):
@@ -124,7 +131,6 @@ class MRPlayer(MRObject):
         if self.client is not None:
             self.client.send(msg)
 
-
     def reachable_objects(self):
         objs = []
         if self.room is not None:
@@ -132,15 +138,20 @@ class MRPlayer(MRObject):
         return objs
 
     def find_doit(self, rest, dofun, **kwargs):
-        util.find_and_do(self, rest, dofun,
-                         self.reachable_objects(),
-                         short_names=util.player_snames(self),
-                         **kwargs)
+        util.find_and_do(
+            self,
+            rest,
+            dofun,
+            self.reachable_objects(),
+            short_names=util.player_snames(self),
+            **kwargs
+        )
 
     def cmd_describe(self, player, rest):
         def doit(thing, _):
-            thing.description = (' '.join(rest.split()[1:])
-                    .replace('\\n', '\n').replace('\\t', '\t'))
+            thing.description = (
+                " ".join(rest.split()[1:]).replace("\\n", "\n").replace("\\t", "\t")
+            )
             self.send("Added description of {}".format(thing.name))
 
         self.find_doit(rest, doit, noarg="Describe what?")
@@ -152,8 +163,9 @@ class MRPlayer(MRObject):
                 return
             cmd = rest.split()[1]
             cmd_name = "cmd_" + cmd
-            cmd_txt = (' '.join(rest.split()[2:])
-                    .replace('\\n', '\n').replace('\\t', '\t'))
+            cmd_txt = (
+                " ".join(rest.split()[2:]).replace("\\n", "\n").replace("\\t", "\t")
+            )
             try:
                 thing.add_cmd(cmd, cmd_name, cmd_txt)
                 self.send("Added command {} to {}".format(cmd_name, thing.name))
@@ -166,38 +178,22 @@ class MRPlayer(MRObject):
         def doit(arg, _):
             if self.room is not None:
                 self.room.contents.remove(self)
-                self.room.emit(self.name + ' has gone to ' + arg.name)
-                arg.emit(self.name + ' arrives from ' + self.room.name)
+                self.room.emit(self.name + " has gone to " + arg.name)
+                arg.emit(self.name + " arrives from " + self.room.name)
             else:
-                arg.emit(self.name + ' pops into the room')
+                arg.emit(self.name + " pops into the room")
             self.room = arg
             self.room.contents.append(self)
             self.cmd_look(self, "here")
 
-        util.find_and_do(player, rest, doit,
-                         db.list_all(MRRoom),
-                         noarg="Go where?",
-                         notfound="Don't know this place. Is it in Canada?")
-
-    def cmd_destroy(self, player, rest):
-        def doit(thing, _):
-            if self.room is not None:
-                if util.is_room(thing):
-                    self.room.emit(player.name + " blew up the place!")
-                    self.room.emit("You fall into the void of nothingness.")
-                    for p in filter(util.is_player, thing.contents):
-                        p.room = None
-                else:
-                    self.room.emit(player.name + " violently destroyed " +
-                                   thing.name + "!")
-                    self.room.contents.remove(thing)
-            db.remove(thing)
-            if util.is_player(thing):
-                if thing.client is not None:
-                    thing.client.player = None
-                    thing.send("Your character has been slain. You were kicked out of it")
-
-        self.find_doit(rest, doit, noarg="Destroy what?")
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            db.list_all(MRRoom),
+            noarg="Go where?",
+            notfound="Don't know this place. Is it in Canada?",
+        )
 
     def cmd_look(self, player, rest):
         def doit(arg, _):
@@ -222,17 +218,21 @@ class MRPlayer(MRObject):
             notfound = "You see nothing but you."
         else:
             notfound = "You see nothing like '{}' here."
-        util.find_and_do(player, rest, doit,
-                         self.reachable_objects(),
-                         short_names=util.player_snames(self, allow_no_room=True),
-                         arg_default="here",
-                         notfound=notfound)
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            self.reachable_objects(),
+            short_names=util.player_snames(self, allow_no_room=True),
+            arg_default="here",
+            notfound=notfound,
+        )
 
     def cmd_examine(self, player, rest):
         def doit(arg, rest):
             if rest:
-                arg_name = '{}.{}'.format(arg.name, rest)
-                arg_cmd = 'arg.{}'.format(rest) if rest.strip() else 'arg'
+                arg_name = "{}.{}".format(arg.name, rest)
+                arg_cmd = "arg.{}".format(rest) if rest.strip() else "arg"
                 try:
                     # XXX: security (who cares?)
                     arg = eval(arg_cmd)
@@ -240,15 +240,16 @@ class MRPlayer(MRObject):
                     self.send("{} has no attribute {}".format(arg.name, rest))
                     return
                 except Exception:
-                    self.send("I don't know what just happened, "
-                              "but don't do that again.")
+                    self.send(
+                        "I don't know what just happened, " "but don't do that again."
+                    )
                     return
             else:
                 arg_name = arg.name
-            self.send('{}: {}'.format(arg_name, util.myrepr(arg, db)))
+            self.send("{}: {}".format(arg_name, util.myrepr(arg, db)))
             internals = {}
             for attr in dir(arg):
-                if attr[0] == '_':
+                if attr[0] == "_":
                     continue
                 attr_val = getattr(arg, attr)
                 if not isinstance(attr_val, util.member_types + (BaseObject,)):
@@ -258,12 +259,16 @@ class MRPlayer(MRObject):
                 for k in sorted(internals):
                     self.send(" - {}: {}".format(k, internals[k]))
 
-        dots = rest.split('.')
-        rest = '{} {}'.format(dots[0], '.'.join(dots[1:]))
-        util.find_and_do(player, rest, doit,
-                         self.reachable_objects(),
-                         short_names=util.player_snames(self),
-                         arg_default="here")
+        dots = rest.split(".")
+        rest = "{} {}".format(dots[0], ".".join(dots[1:]))
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            self.reachable_objects(),
+            short_names=util.player_snames(self),
+            arg_default="here",
+        )
 
 
 @register
@@ -287,8 +292,8 @@ class MRArchi(MRPower):
     """
 
     fw_cmds = {
-        'eval':'cmd_eval',
-        'exec':'cmd_exec',
+        "eval": "cmd_eval",
+        "exec": "cmd_exec",
     }
 
     def cmd_eval(self, rest):
@@ -301,14 +306,55 @@ class MRArchi(MRPower):
     def cmd_exec(self, rest):
         try:
             genv, lenv = self._safe_env()
-            exec(rest.replace('\\n', '\n').replace('\\t', '\t'), genv, lenv)
+            exec(rest.replace("\\n", "\n").replace("\\t", "\t"), genv, lenv)
         except Exception as pbm:
             self.send(str(pbm))
 
 
 @register
-class ArchiPlayer(MRPlayer):
+class Maker(MRPower):
+    fw_cmds = {
+        "dig": "cmd_dig",
+        "make": "cmd_make",
+        "destroy": "cmd_destroy",
+    }
 
+    def cmd_make(self, query):
+        """Make things. Just regular things."""
+        name = query
+        thing = MRThing(name)
+        thing.room = self.room
+        self.room.contents.add(thing)
+        db.add(thing)
+        self.room.emit(f'{self.name} makes {name} appear out of thin air.')
+
+    def cmd_destroy(self, query):
+        """Destroy things. Anything, really."""
+        def doit(thing, _):
+            if self.room is not None:
+                if util.is_room(thing):
+                    self.room.emit(f"{self.name} blew up the place!")
+                    self.room.emit("You fall into the void of nothingness.")
+                    for p in filter(util.is_player, thing.contents):
+                        p.room = None
+                else:
+                    self.room.emit(
+                        self.name + " violently destroyed " + thing.name + "!"
+                    )
+                    self.room.contents.remove(thing)
+            db.remove(thing)
+            if util.is_player(thing):
+                if thing.client is not None:
+                    thing.client.player = None
+                    thing.send(
+                        "Your character has been slain. You were kicked out of it"
+                    )
+
+        self.find_doit(query, doit, noarg="Destroy what?")
+
+
+@register
+class ArchiPlayer(MRPlayer):
     fancy_name = "archi"
 
     def __init__(self, name):
@@ -318,9 +364,9 @@ class ArchiPlayer(MRPlayer):
     def _safe_env(self):
         cl = self.client
         locd = {
-            'client': cl,
-            'db': db,
-            'me': cl.player,
-            'here': cl.player.room if cl.player is not None else None,
+            "client": cl,
+            "db": db,
+            "me": cl.player,
+            "here": cl.player.room if cl.player is not None else None,
         }
         return globals(), locd

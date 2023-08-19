@@ -1,6 +1,5 @@
 from . import util
 
-from .interface import BaseClient
 from .register import get_type
 
 from .commands import HelpCommand
@@ -8,7 +7,7 @@ from .commands import PlayCommand
 from .commands import WrapperCommand
 
 
-class MRClient(BaseClient):
+class MRClient:
     """
     This class is one of the only interfaces
     between the FW and the server.
@@ -19,10 +18,30 @@ class MRClient(BaseClient):
             'play'   : PlayCommand,
     }
 
-
     def __init__(self, handler, name):
-        BaseClient.__init__(self, handler, name)
+        self.handler = handler
+        self.name = name
+        self.cmds = {}
+        for k, v in self.fw_cmds.items():
+            self.add_cmd(k, v())
         self.player = None
+
+    def add_cmd(self, name, command):
+        self.cmds[name] = command
+
+    def remove_cmd(self, command):
+        if type(command) is str and command in self.cmds:
+            del self.cmds[command]
+        else:
+            for k in [x for x in self.cmds if self.cmds[x] == command]:
+                del self.cmds[k]
+
+    def send(self, msg):
+        try:
+            self.handler.handler_write((msg + "\n"))
+        except IOError:
+            util.log_err(f"Could not send to {self.name}")
+
 
     def available_cmds(self):
         """
@@ -72,4 +91,3 @@ class MRClient(BaseClient):
     def on_disconnect(self):
         if self.player is not None:
             self.player.client = None
-

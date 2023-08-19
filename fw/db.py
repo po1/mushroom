@@ -1,7 +1,7 @@
 import pickle
 
 from . import util
-from .interface import BaseObject
+from .object import BaseObject
 
 
 """ The database holding the world.  """

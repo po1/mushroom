@@ -15,6 +15,7 @@ member_types = (
     str,
 )
 
+
 def log_err(msg):
     print(msg, file=sys.stderr)
 
@@ -36,7 +37,7 @@ def is_player(thing):
 
 
 def match_name(short, name):
-    if short == name[:len(short)]:
+    if short == name[: len(short)]:
         return True
     return False
 
@@ -46,21 +47,25 @@ def match_list(short, elts):
 
 
 def player_snames(player, allow_no_room=False):
-    sn = {'me': player}
+    sn = {"me": player}
     if player.room is not None or allow_no_room:
-        sn['here'] = player.room
+        sn["here"] = player.room
     return sn
 
 
-def find_and_do(player, rest, dofun, search_list,
-                arg_default=None,
-                short_names=None,
-                noarg="Pardon?",
-                notfound="You see nothing like '{}' here.",
-                ):
+def find_and_do(
+    player,
+    rest,
+    dofun,
+    search_list,
+    arg_default=None,
+    short_names=None,
+    noarg="Pardon?",
+    notfound="You see nothing like '{}' here.",
+):
     try:
         what = rest.split()[0]
-        rest = ' '.join(rest.split()[1:])
+        rest = " ".join(rest.split()[1:])
     except IndexError:
         if arg_default is None:
             player.send(noarg)
@@ -81,27 +86,32 @@ def find_and_do(player, rest, dofun, search_list,
 
 def multiple_choice(choices):
     names = [x.name for x in choices]
-    return "Which one?\nChoices are: " + ', '.join(names)
+    return "Which one?\nChoices are: " + ", ".join(names)
 
 
 def myrepr(obj, db=None):
     if type(obj) in (str, int, float, bool):
         return repr(obj)
     elif isinstance(obj, list):
-        return '[{}]'.format(', '.join([myrepr(x, db) for x in obj]))
+        return "[{}]".format(", ".join([myrepr(x, db) for x in obj]))
     elif isinstance(obj, tuple):
-        return '({})'.format(', '.join([myrepr(x, db) for x in obj]))
+        return "({})".format(", ".join([myrepr(x, db) for x in obj]))
     elif isinstance(obj, dict):
-        return '{{{}}}'.format(', '.join(['{}: {}'.format(myrepr(k, db),
-                                                          myrepr(v, db))
-                                            for k, v in list(obj.items())]))
+        return "{{{}}}".format(
+            ", ".join(
+                [
+                    "{}: {}".format(myrepr(k, db), myrepr(v, db))
+                    for k, v in list(obj.items())
+                ]
+            )
+        )
     elif obj is None:
-        return 'None'
+        return "None"
     else:
-        ret = '<{}>'.format(obj.__class__.__name__)
+        ret = "<{}>".format(obj.__class__.__name__)
         if db is not None:
             try:
-                ret += '#{}'.format(db.get_id(obj))
+                ret += "#{}".format(db.get_id(obj))
             except Exception:
                 pass
         return ret
