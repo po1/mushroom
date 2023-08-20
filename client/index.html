@@ -1,0 +1,85 @@
+<html>
+
+<head>
+    <title>A simple netcat client</title>
+    <style>
+        body {
+            background-color: rgb(4, 18, 0);
+            color: rgb(199, 224, 192);
+        }
+
+        .container {
+            padding: 32px;
+            width: 800px;
+        }
+
+        .console {
+            height: 480px;
+            border: solid;
+            border-radius: 8px;
+            border-color: rgb(76, 75, 83);
+            padding: 10px;
+
+            background-color: rgb(8, 36, 0);
+
+            margin-bottom: 10px;
+            margin-top: 10px;
+        }
+
+        .console-text {
+            overflow: auto;
+            max-height: calc(100% - 20px);
+            white-space: pre-wrap;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.7.0.slim.min.js"></script>
+    <script>
+        $(() => {
+            var ws;
+
+            $('.input').keypress(e => {
+                if (e.which == 13) {
+                    if (ws === undefined || ws.readyState !== 1) {
+                        return true;
+                    }
+                    const sh = $('.console-text').get(0).scrollHeight;
+                    const line = $('.input').val()
+                    $('.console-text').append('<br /> &gt; ' + line + '<br />').scrollTop(sh);
+                    $('.input').val('');
+
+                    ws.send(`${line}\n`);
+
+                    return false;    //<---- Add this line
+                }
+            });
+
+            $('input[type=button]').click(() => {
+                ws = new WebSocket($('input[name=wshost]').val());
+                ws.onerror = console.log;
+                ws.onmessage = m => {
+                    m.data.text().then(text => {
+                        text = text
+                            .replace(/\033[^m]+m/g, '')
+                            .replaceAll('&', '&amp;')
+                            .replaceAll('<', '&lt;')
+                            .replaceAll('>', '&gt;');
+                        const sh = $('.console-text').get(0).scrollHeight;
+                        $('.console-text').append(text).scrollTop(sh);
+                    });
+                };
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <input name="wshost" value="ws://127.0.0.1:1338"><input type="button" value="Connect">
+        <div class="console">
+            <pre class="console-text"></pre>
+        </div>
+        <input class="input" style="width:100%">
+    </div>
+</body>
+
+</html>

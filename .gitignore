@@ -1,3 +1,4 @@
 *.swp
 world.sav
 *.pyc
+node_modules/
