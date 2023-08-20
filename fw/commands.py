@@ -1,104 +1,118 @@
-from . import util
+from __future__ import annotations
 
-from .db import db
-from .register import get_type
+import re
 
-class BaseCommand:
-    hidden = False
-    help_text = ""
+from .object import proxify
 
-    def call(self, caller, command, rest):
+
+class Caller:
+    def send(self, text):
         pass
 
 
-class HelpCommand(BaseCommand):
-    help_text = ("syntax: help <command>\n"
-                 "Displays help topics for the given command.")
+class Action:
+    def match(self, caller: Caller, query: str) -> bool:
+        """Run the action if the query matches.
 
-    def call(self, caller, command, rest):
-        if not rest.strip():
-            visible_commands = [x for x in caller.available_cmds()
-                                if not caller.available_cmds()[x].hidden]
-            caller.send("Available commands:")
-            caller.send("  {}".format(', '.join(sorted(visible_commands))))
-            return
-        cmd_name = rest.split()[0]
-        matchs = [x for x in caller.available_cmds()
-                  if cmd_name.lower() == x[:len(cmd_name)]]
-        if not matchs:
-            caller.send("Command {} was not found".format(cmd_name))
-            return
-        cmd = caller.available_cmds()[matchs[0]]
-        caller.send("{}\n\n{}".format(matchs[0], cmd.help_text))
+        Returns True if there was a match, False otherwise.
+        """
+        return False
+
+
+class BaseCommand(Action):
+    help_text = ""
+    name = ""
+
+    command_regex = re.compile(r"(\w+)(?: (.*))?")
+
+    def __repr__(self):
+        return f"<built-in command {self.name}>"
+
+    def match(self, caller: Caller, query: str) -> bool:
+        m = self.command_regex.match(query)
+        if m is None:
+            return False
+        command, args = m.groups()
+        if command.lower() != self.name:
+            return False
+
+        self.run(caller, args)
+        return True
 
 
 class WrapperCommand(BaseCommand):
-    """ This is used to provide backwards compatibility with commands when
-    they were just methods """
+    """This is used to provide backwards compatibility with commands when
+    they were just methods"""
 
-    help_text = "no help available"
+    help_text = "No help available"
 
-    def __init__(self, func, who=None):
+    def __init__(self, cmd, func):
+        self.name = cmd
         self.func = func
-        self.who = who
+        self.help_text = func.__doc__ or self.help_text
 
-    def call(self, caller, command, rest):
+    def run(self, caller, query):
         if self.func:
-            self.func(self.who, rest)
+            self.func(caller, query)
 
 
-class Answer(BaseCommand):
-    hidden = True
+class CustomCommand(BaseCommand):
+    """For user-supplied scripts."""
 
-    def __init__(self, answers):
+    help_text = "No help available"
+
+    def __init__(self, name, txt, owner):
+        self.name = name
+        self.txt = txt
+        self.owner = owner
+
+    def __repr__(self):
+        txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
+        return f"<code: {txt}>"
+
+    def run(self, caller, query):
+        locs = {
+            "send": caller.send,
+            "self": proxify(self.owner),
+            "caller": proxify(caller),
+            "here": proxify(caller.room),
+            "query": query,
+        }
+        try:
+            # same dictionary for globs & locs to be in module scope
+            exec(self.txt, locs, locs)
+        except Exception as e:
+            caller.send(f"command {self.name} failed: ({e.__class__.__name__}) {e}")
+
+
+class Answer(Action):
+    def __init__(self, answers: list[tuple[str, callable[Caller]]]):
         self.answers = answers
+        self.cleanup = None
 
-    def call(self, caller, command, rest):
-        for k, v in self.answers.items():
-            if command.lower() == k[:len(command)]:
-                if v:
-                    v(caller)
-                break
-        caller.remove_cmd(self)
+    def match(self, caller, query):
+        q = query.lower()
+        for a, c in self.answers:
+            if q == a:
+                if self.cleanup:
+                    self.cleanup()
+                if c:
+                    c(caller)
+                return True
+        return False
 
 
 class YesNoAnswer(Answer):
-    def __init__(self, yes, no):
-        Answer.__init__(self, answers={'yes': yes, 'no': no})
+    def __init__(self, yes_action, no_action):
+        yes_answers = ["yes", "sure", "ya", "ok"]
+        no_answers = ["no", "nope", "nah"]
+        answers = [(x, yes_action) for x in yes_answers] + [
+            (x, no_action) for x in no_answers
+        ]
+        super(YesNoAnswer, self).__init__(answers)
 
 
-class PlayCommand(BaseCommand):
-    command = "play"
-    help_text = (
-        "syntax: play <name>\n"
-        "Start playing as the given character. If the character is not\n"
-        "found, the player will be invited to create a new one."
-    )
-
-    def create_character(self, caller, name):
-        char = get_type('player')(name)
-        db.add(char)
-        self.play(caller, char)
-
-    def play(self, caller, char):
-        caller.player = char
-        char.client = caller
-        caller.remove_cmd(self)
-        caller.send("You are now playing as {}".format(char.name))
-
-    def call(self, caller, command, rest):
-        if not rest.strip():
-            caller.send("Play who?")
-            return
-
-        matchs = util.match_list(rest, db.list_all(get_type('player')))
-        if not matchs:
-            caller.send("Couldn't find a character named {}.\n"
-                        "Create it?".format(rest))
-            yna = YesNoAnswer(lambda x: self.create_character(x, rest), None)
-            caller.add_cmd('yes', yna)
-            caller.add_cmd('no', yna)
-            return
-        self.play(caller, matchs[0])
-
-
+def add_answer_to(answer, target):
+    """Add and register cleanup."""
+    answer.cleanup = lambda: target.remove_cmd(answer)
+    target.add_cmd(answer)

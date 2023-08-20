@@ -1,7 +1,8 @@
-from .register import get_type
-
+import re
 import sys
 import threading
+
+from .register import get_type
 
 member_types = (
     bool,
@@ -37,7 +38,7 @@ def is_player(thing):
 
 
 def match_name(short, name):
-    if short == name[: len(short)]:
+    if short.lower() == name[: len(short)].lower():
         return True
     return False
 
@@ -55,7 +56,7 @@ def player_snames(player, allow_no_room=False):
 
 def find_and_do(
     player,
-    rest,
+    what,
     dofun,
     search_list,
     arg_default=None,
@@ -63,25 +64,21 @@ def find_and_do(
     noarg="Pardon?",
     notfound="You see nothing like '{}' here.",
 ):
-    try:
-        what = rest.split()[0]
-        rest = " ".join(rest.split()[1:])
-    except IndexError:
-        if arg_default is None:
-            player.send(noarg)
-            return
-        what = arg_default
+    what = what or arg_default
+    if what is None:
+        player.send(noarg)
+        return
     found = match_list(what, search_list)
     if short_names is None:
         short_names = player_snames(player)
     if what in short_names:
-        dofun(short_names[what], rest)
+        dofun(short_names[what], what)
     elif len(found) < 1:
         player.send(notfound.format(what))
     elif len(found) > 1:
         player.send(multiple_choice(found))
     else:
-        dofun(found[0], rest)
+        dofun(found[0], what)
 
 
 def multiple_choice(choices):
@@ -182,3 +179,25 @@ class RWLock:
                 self.w_cv.notify()
             elif self.writers == 0:
                 self.r_cv.notifyAll()
+
+
+def escape(input):
+    def sub(match):
+        return {
+            "\n": "\\n",
+            "\t": "\\t",
+            "\\": "\\\\",
+        }[match.group(1)]
+
+    return re.sub(r"(\n|\t|\\)", sub, input)
+
+
+def unescape(input):
+    def sub(match):
+        return {
+            "\\": "\\",
+            "n": "\n",
+            "t": "\t",
+        }[match.group(1)]
+
+    return re.sub(r"\\(.)", sub, input)
