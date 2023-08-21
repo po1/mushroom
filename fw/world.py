@@ -1,4 +1,9 @@
+import bisect
+from collections.abc import Iterable
+import queue
 import re
+import threading
+import time
 
 from . import util
 from .commands import CustomCommand
@@ -6,6 +11,61 @@ from .commands import WrapperCommand
 from .db import db
 from .object import BaseObject, proxify
 from .register import register
+
+
+class Game:
+    def __init__(self) -> None:
+        self._timers = []  # ordered by increasing expiration time
+        self._event_queue = queue.SimpleQueue()
+        self._loop_thread = threading.Thread(target=self._loop)
+        self._loop_thread.daemon = True
+        self._loop_thread.start()
+
+    def __dir__(self) -> Iterable[str]:
+        return [
+            x
+            for x in list(self.__dict__) + list(self.__class__.__dict__)
+            if not x.startswith("_")
+        ]
+
+    def schedule(self, when, event):
+        """Schedules an event to happen in <when> seconds."""
+        bisect.insort(self._timers, (time.time() + when, event))
+        self._event_queue.put(None)  # wake up
+
+    def _next_timeout(self):
+        # wake up the thread every second, just, you know, for fun.
+        if not self._timers:
+            return 1.0
+        return min(self._timers[0][0] - time.time(), 1.0)
+
+    def _loop(self):
+        while True:
+            try:
+                event = self._event_queue.get(timeout=self._next_timeout())
+            except queue.Empty:
+                pass
+            else:
+                if event is not None:
+                    event()  # self-dispatching events are tight
+            self._handle_timers()
+
+    def _handle_timers(self):
+        now = time.time()
+        while self._timers:
+            when, evt = self._timers[0]
+            if when > now:
+                return
+            del self._timers[0]
+            if evt is not None:
+                evt()
+
+
+_game = Game()
+
+
+def game():
+    return _game
 
 
 class MRObject(BaseObject):
@@ -366,6 +426,7 @@ class Engineer(MRPower):
 
     def exec_env(self, caller):
         locs = {
+            "game": game,
             "db": lambda x: proxify(db.get(x)),
             "me": proxify(caller),
         }
@@ -458,8 +519,8 @@ class Engineer(MRPower):
         target, cmd, txt = match.groups()
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
-        def doit(thing, _):
-            thing.add_cmd(CustomCommand(cmd, txt, thing))
+        def doit(thing):
+            thing.add_cmd(CustomCommand(cmd, txt, thing, env={"game": game}))
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
