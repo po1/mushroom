@@ -72,7 +72,7 @@ class CustomCommand(BaseCommand):
         return f"<code: {txt}>"
 
     def run(self, caller, query):
-        locs = dict(self.env)
+        locs = dict(getattr(self, 'env', {}))
         locs.update(
             {
                 "send": caller.send,
