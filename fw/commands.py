@@ -23,7 +23,7 @@ class BaseCommand(Action):
     help_text = ""
     name = ""
 
-    command_regex = re.compile(r"(\w+)(?: (.*))?")
+    command_regex = re.compile(r"([^ ]+)(?: (.*))?")
 
     def __repr__(self):
         return f"<built-in command {self.name}>"
