@@ -1,11 +1,13 @@
+import os
 import pickle
 
 from . import util
 from .object import BaseObject
 
 
-""" The database holding the world.  """
 class Database:
+    """The database holding the world."""
+
     def __init__(self):
         self.objects = {}
         self.ids = {}  # use a reverse map
@@ -31,14 +33,14 @@ class Database:
 
     def get(self, obj_id):
         with self.lock.r:
-           return self.objects.get(obj_id, None)
+            return self.objects.get(obj_id, None)
 
     def get_id(self, obj):
         with self.lock.r:
             return self.ids[obj]
 
     def load(self, db_file):
-        with open(db_file, 'rb') as f:
+        with open(db_file, "rb") as f:
             self.objects = pickle.load(f)
             if self.objects:
                 self.last_id = max(self.objects.keys()) + 1
@@ -47,8 +49,10 @@ class Database:
 
     def dump(self, db_file):
         with self.lock.r:
-            with open(db_file, 'wb') as f:
+            tempfile = f"{db_file}.tmp"
+            with open(tempfile, "wb") as f:
                 pickle.dump(self.objects, f)
+            os.replace(tempfile, db_file)
 
     def search(self, name, type=BaseObject):
         found = []
@@ -62,6 +66,7 @@ class Database:
     def list_all(self, type):
         with self.lock.r:
             return self.search("", type)
+
 
 # global instance
 db = Database()
