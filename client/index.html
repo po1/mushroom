@@ -31,14 +31,48 @@
             max-height: calc(100% - 20px);
             white-space: pre-wrap;
         }
+
+        .online-status {
+            font-weight: bold;
+            color: greenyellow;
+            font-size: larger;
+            display: none;
+            text-align: center;
+            width: 120px;
+        }
     </style>
     <script src="https://code.jquery.com/jquery-3.7.0.slim.min.js"></script>
     <script>
         $(() => {
-            var ws;
+            let ws;
+            const history = [];
+            let history_cursor;
+
+            $('.input').keydown(e => {
+                if (e.key == "ArrowUp") {
+                    if (history_cursor === undefined) {
+                        history_cursor = history.length;
+                    } else if (history_cursor === 0) {
+                        return true;
+                    }
+
+                    history_cursor--;
+                    $('.input').val(history[history_cursor]);
+                    return false;
+                } else if (e.key == "ArrowDown" && history_cursor !== undefined) {
+                    if (history_cursor >= history.length - 1) {
+                        history_cursor = undefined;
+                        $('.input').val('');
+                        return false;
+                    }
+                    history_cursor++;
+                    $('.input').val(history[history_cursor]);
+                    return false;
+                }
+            });
 
             $('.input').keypress(e => {
-                if (e.which == 13) {
+                if (e.key == "Enter") {
                     if (ws === undefined || ws.readyState !== 1) {
                         return true;
                     }
@@ -46,6 +80,9 @@
                     const line = $('.input').val()
                     $('.console-text').append('<br /> &gt; ' + line + '<br />').scrollTop(sh);
                     $('.input').val('');
+
+                    history.push(line);
+                    history_cursor = undefined;
 
                     ws.send(`${line}\n`);
 
@@ -56,6 +93,12 @@
             $('input[type=button]').click(() => {
                 ws = new WebSocket($('input[name=wshost]').val());
                 ws.onerror = console.log;
+                ws.onclose = e => {
+                    $('.online-status').hide();
+                };
+                ws.onopen = e => {
+                    $('.online-status').show();
+                };
                 ws.onmessage = m => {
                     m.data.text().then(text => {
                         text = text
@@ -75,6 +118,7 @@
 <body>
     <div class="container">
         <input name="wshost" value="ws://127.0.0.1:1338"><input type="button" value="Connect">
+        <span class="online-status">online</span>
         <div class="console">
             <pre class="console-text"></pre>
         </div>
