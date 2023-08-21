@@ -29,7 +29,7 @@ class MRObject(BaseObject):
         ]
 
     def __dir__(self):
-        return [k for k in self.__dict__ if not k.startswith('_')]
+        return [k for k in self.__dict__ if not k.startswith("_")]
 
     def __repr__(self):
         return f"<#{self.id} {self.fancy_name} {self.name}>"

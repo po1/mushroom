@@ -61,26 +61,29 @@ class CustomCommand(BaseCommand):
 
     help_text = "No help available"
 
-    def __init__(self, name, txt, owner):
+    def __init__(self, name, txt, owner, env=None):
         self.name = name
         self.txt = txt
         self.owner = owner
+        self.env = env or {}
 
     def __repr__(self):
         txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
         return f"<code: {txt}>"
 
     def run(self, caller, query):
-        locs = {
-            "send": caller.send,
-            "self": proxify(self.owner),
-            "caller": proxify(caller),
-            "here": proxify(caller.room),
-            "query": query,
-        }
+        locs = dict(self.env)
+        locs.update(
+            {
+                "send": caller.send,
+                "self": proxify(self.owner),
+                "caller": proxify(caller),
+                "here": proxify(caller.room),
+                "query": query,
+            }
+        )
         try:
-            # same dictionary for globs & locs to be in module scope
-            exec(self.txt, locs, locs)
+            exec(self.txt, locs)
         except Exception as e:
             caller.send(f"command {self.name} failed: ({e.__class__.__name__}) {e}")
 
@@ -104,8 +107,8 @@ class Answer(Action):
 
 class YesNoAnswer(Answer):
     def __init__(self, yes_action, no_action):
-        yes_answers = ["yes", "sure", "ya", "ok"]
-        no_answers = ["no", "nope", "nah"]
+        yes_answers = ["yes", "sure", "yup", "ok", "aye"]
+        no_answers = ["no", "nope", "nah", "nay"]
         answers = [(x, yes_action) for x in yes_answers] + [
             (x, no_action) for x in no_answers
         ]
