@@ -120,10 +120,10 @@ class MRRoom(MRObject):
     def cmd_link(self, caller, query):
         """link [to] <place>: open an exit towards the place."""
         if query is None:
-            return caller.send('Link what?')
+            return caller.send("Link what?")
         where = re.match(r"(?:to )?(.*)", query).group(1)
 
-        def doit(arg, _):
+        def doit(arg):
             self.exits.append(arg)
             self.emit("Linked {} and {}".format(arg.name, self.name))
 
@@ -137,7 +137,8 @@ class MRRoom(MRObject):
 
     def cmd_unlink(self, player, rest):
         """unlink <place>: remove the exit to that place."""
-        def doit(arg, _):
+
+        def doit(arg):
             self.exits.remove(arg)
             self.emit("Unlinked {} and {}".format(arg.name, self.name))
 
@@ -151,10 +152,10 @@ class MRRoom(MRObject):
         )
 
     def cmd_take(self, caller, query):
-        def doit(obj, _):
+        def doit(obj):
             self.contents.remove(obj)
             caller.pockets.append(obj)
-            self.emit(f'{caller.name} puts {obj.name} in their pocket.')
+            self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
         util.find_and_do(
             caller,
@@ -166,10 +167,12 @@ class MRRoom(MRObject):
         )
 
     def cmd_drop(self, caller, query):
-        def doit(obj, _):
+        def doit(obj):
             caller.pockets.remove(obj)
             self.contents.append(obj)
-            self.emit(f'{caller.name} takes {obj.name} out of their pocket and leaves it.')
+            self.emit(
+                f"{caller.name} takes {obj.name} out of their pocket and leaves it."
+            )
 
         util.find_and_do(
             caller,
@@ -261,7 +264,7 @@ class MRPlayer(MRObject):
             return self.send("Describe what?")
         what, description = re.match(r"(\w+) (.*)", query).groups()
 
-        def doit(thing, _):
+        def doit(thing):
             thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
             self.send("Added description of {}".format(thing.name))
 
@@ -273,7 +276,7 @@ class MRPlayer(MRObject):
             return self.send("Go where?")
         place = re.match(r"(?:to )?(.*)", query).group(1)
 
-        def doit(arg, _):
+        def doit(arg):
             if self.room is not None:
                 self.room.contents.remove(self)
                 self.room.emit(self.name + " has gone to " + arg.name)
@@ -294,12 +297,14 @@ class MRPlayer(MRObject):
 
     def cmd_look(self, player, query):
         """look [object]: see descriptions of things, people or places."""
-        def doit(arg, _):
+
+        def doit(arg):
             if arg is None:
                 self.send("You only see nothing. A lot of nothing.")
                 return
             self.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
             if util.is_room(arg):
+                self.send("")  # extra newline
                 if len(arg.contents) == 0:
                     self.send("It is empty")
                 else:
@@ -366,14 +371,13 @@ class Engineer(MRPower):
         }
         if caller.room is not None:
             locs["here"] = proxify(caller.room)
-        globs = {}
-        return globs, locs
+        return locs
 
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
         try:
-            genv, lenv = self.exec_env(caller)
-            caller.send(repr(eval(rest, genv, lenv)))
+            env = self.exec_env(caller)
+            caller.send(repr(eval(rest, env)))
         except Exception as e:
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
@@ -381,8 +385,8 @@ class Engineer(MRPower):
     def cmd_exec(self, caller, rest):
         """exec <string>: execute raw code."""
         try:
-            genv, lenv = self.exec_env(caller)
-            exec(util.unescape(rest), genv, lenv)
+            env = self.exec_env(caller)
+            exec(util.unescape(rest), env)
         except Exception as e:
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
@@ -393,10 +397,12 @@ class Engineer(MRPower):
         if query is None:
             return caller.send("Examine what?")
 
-        def doit(obj, _):
+        def doit(obj):
             what = proxify(obj)
             caller.send(f"{what}:")
-            caller.send("\n".join(f"  {k}: {repr(getattr(what, k))}" for k in dir(what)))
+            caller.send(
+                "\n".join(f"  {k}: {repr(getattr(what, k))}" for k in dir(what))
+            )
 
         if (m := re.match(r"#(\d+)", query)) is not None:
             return doit(db.get(int(m.group(1))), None)
@@ -414,10 +420,10 @@ class Engineer(MRPower):
             return caller.send("Try help setattr")
 
         target, attr, value = match.groups()
-        if (match := re.match(r'#(\d+)', value)) is not None:
+        if (match := re.match(r"#(\d+)", value)) is not None:
             value = db.get(int(match.group(1)))
 
-        def doit(obj, _):
+        def doit(obj):
             setattr(obj, attr, value)
 
         if (m := re.match(r"#(\d+)", target)) is not None:
@@ -428,15 +434,12 @@ class Engineer(MRPower):
     def cmd_delattr(self, caller, query):
         """delattr <object> <attribute>: delete an attribute on an object.
         <object> can be a # database ID."""
-        if (
-            query is None
-            or (match := re.match(r"(#\d+|\w+) ([^ ]+)", query)) is None
-        ):
+        if query is None or (match := re.match(r"(#\d+|\w+) ([^ ]+)", query)) is None:
             return caller.send("Try help delattr")
 
         target, attr = match.groups()
 
-        def doit(obj, _):
+        def doit(obj):
             delattr(obj, attr)
 
         if (m := re.match(r"#(\d+)", target)) is not None:
@@ -446,7 +449,10 @@ class Engineer(MRPower):
 
     def cmd_cmd(self, caller, query):
         """cmd <object> <cmd> <code>: add a command to an object."""
-        if query is None or (match := re.match(r"(\w+) (\w+) (.*)", query)) is None:
+        if (
+            query is None
+            or (match := re.match(r"((?:\w+)|(?:#\d+)) ([^ ]+) (.*)", query)) is None
+        ):
             caller.send("Try 'help cmd'. Haha.")
             return
         target, cmd, txt = match.groups()
@@ -456,7 +462,10 @@ class Engineer(MRPower):
             thing.add_cmd(CustomCommand(cmd, txt, thing))
             caller.send(f"Added command {cmd} to {thing.name}")
 
-        caller.find_doit(target, doit)
+        if (m := re.match("#(\d+)", target)) is not None:
+            doit(db.get(int(m.group(1))))
+        else:
+            caller.find_doit(target, doit)
 
 
 class Maker(MRPower):
@@ -480,7 +489,7 @@ class Maker(MRPower):
     def cmd_make(self, caller, query):
         """make <thing name>: make things. Just regular things."""
         if caller.room is None:
-            return caller.send('There is nowehere to make things into.')
+            return caller.send("There is nowehere to make things into.")
         name = query
         thing = MRThing(name)
         db.add(thing)
@@ -493,7 +502,7 @@ class Maker(MRPower):
         if query is None:
             return caller.send("Destroy what?")
 
-        def doit(thing, _):
+        def doit(thing):
             if caller.room is not None:
                 if util.is_room(thing):
                     caller.room.emit(f"{caller.name} blew up the place!")

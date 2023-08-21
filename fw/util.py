@@ -72,13 +72,13 @@ def find_and_do(
     if short_names is None:
         short_names = player_snames(player)
     if what in short_names:
-        dofun(short_names[what], what)
+        dofun(short_names[what])
     elif len(found) < 1:
         player.send(notfound.format(what))
     elif len(found) > 1:
         player.send(multiple_choice(found))
     else:
-        dofun(found[0], what)
+        dofun(found[0])
 
 
 def multiple_choice(choices):
