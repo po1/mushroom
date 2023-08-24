@@ -148,8 +148,6 @@ class MRRoom(MRObject):
     fw_cmds = {
         "say": "cmd_say",
         "emit": "cmd_emit",
-        "link": "cmd_link",
-        "unlink": "cmd_unlink",
         "take": "cmd_take",
         "drop": "cmd_drop",
     }
@@ -176,40 +174,6 @@ class MRRoom(MRObject):
     def cmd_emit(self, player, rest):
         """emit <stuff>: broadcast text in the current room."""
         self.emit(rest.replace("\\n", "\n").replace("\\t", "\t"))
-
-    def cmd_link(self, caller, query):
-        """link [to] <place>: open an exit towards the place."""
-        if query is None:
-            return caller.send("Link what?")
-        where = re.match(r"(?:to )?(.*)", query).group(1)
-
-        def doit(arg):
-            self.exits.append(arg)
-            self.emit("Linked {} and {}".format(arg.name, self.name))
-
-        util.find_and_do(
-            caller,
-            where,
-            doit,
-            db.list_all(MRRoom),
-            notfound="Don't know this place. Is it in Canada?",
-        )
-
-    def cmd_unlink(self, player, rest):
-        """unlink <place>: remove the exit to that place."""
-
-        def doit(arg):
-            self.exits.remove(arg)
-            self.emit("Unlinked {} and {}".format(arg.name, self.name))
-
-        util.find_and_do(
-            player,
-            rest,
-            doit,
-            self.exits,
-            noarg="Unlink what?",
-            notfound="This room ain't connected to Canada.",
-        )
 
     def cmd_take(self, caller, query):
         def doit(obj):
@@ -302,6 +266,10 @@ class MRPlayer(MRObject):
         if self.client is not None:
             self.client.send(msg)
 
+    def emit(self, msg):
+        if self.room is not None:
+            self.room.emit(msg)
+
     def reachable_objects(self):
         objs = list(self.pockets)
         if self.room is not None:
@@ -330,28 +298,29 @@ class MRPlayer(MRObject):
 
         self.find_doit(what, doit)
 
-    def cmd_go(self, player, query):
+    def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
         if query is None:
             return self.send("Go where?")
         place = re.match(r"(?:to )?(.*)", query).group(1)
 
+        if caller.room is None:
+            self.send("You're nowhere. And can't go anywhere :'(")
+            return
+
         def doit(arg):
-            if self.room is not None:
-                self.room.contents.remove(self)
-                self.room.emit(self.name + " has gone to " + arg.name)
-                arg.emit(self.name + " arrives from " + self.room.name)
-            else:
-                arg.emit(self.name + " pops into the room")
+            self.room.contents.remove(self)
+            self.room.emit(self.name + " has gone to " + arg.name)
+            arg.emit(self.name + " arrives from " + self.room.name)
             self.room = arg
             self.room.contents.append(self)
             self.cmd_look(self, "here")
 
         util.find_and_do(
-            player,
+            caller,
             place,
             doit,
-            db.list_all(MRRoom),
+            caller.room.exits,
             notfound="Don't know this place. Is it in Canada?",
         )
 
@@ -534,6 +503,9 @@ class Maker(MRPower):
         "dig": "cmd_dig",
         "make": "cmd_make",
         "destroy": "cmd_destroy",
+        "link": "cmd_link",
+        "unlink": "cmd_unlink",
+        "teleport": "cmd_teleport",
     }
 
     def cmd_dig(self, caller, query):
@@ -541,11 +513,45 @@ class Maker(MRPower):
         room = MRRoom(query)
         db.add(room)
         if caller.room is None:
-            caller.send("In a flash of darkness, a new place apepars around you.")
-            caller.cmd_go(caller, query)
+            caller.send("In a flash of darkness, a new place appears around you.")
+            caller.cmd_teleport(caller, query)
             return
-        caller.room.emit(f"{caller.name} opens a new path towards {query}")
-        caller.room.cmd_link(caller, query)
+        caller.emit(f"{caller.name} opens a new path towards {query}")
+        self.cmd_link(caller, query)
+
+    def cmd_link(self, caller, query):
+        """link [to] <place>: open an exit towards the place."""
+        if query is None:
+            return caller.send("Link what?")
+        where = re.match(r"(?:to )?(.*)", query).group(1)
+
+        def doit(arg):
+            self.exits.append(arg)
+            self.emit("Linked {} and {}".format(arg.name, self.name))
+
+        util.find_and_do(
+            caller,
+            where,
+            doit,
+            db.list_all(MRRoom),
+            notfound="Don't know this place. Is it in Canada?",
+        )
+
+    def cmd_unlink(self, player, rest):
+        """unlink <place>: remove the exit to that place."""
+
+        def doit(arg):
+            self.exits.remove(arg)
+            self.emit("Unlinked {} and {}".format(arg.name, self.name))
+
+        util.find_and_do(
+            player,
+            rest,
+            doit,
+            self.exits,
+            noarg="Unlink what?",
+            notfound="This room ain't connected to Canada.",
+        )
 
     def cmd_make(self, caller, query):
         """make <thing name>: make things. Just regular things."""
@@ -564,17 +570,15 @@ class Maker(MRPower):
             return caller.send("Destroy what?")
 
         def doit(thing):
-            if caller.room is not None:
-                if util.is_room(thing):
-                    caller.room.emit(f"{caller.name} blew up the place!")
-                    caller.room.emit("You fall into the void of nothingness.")
-                    for p in filter(util.is_player, thing.contents):
-                        p.room = None
-                else:
-                    caller.room.emit(
-                        caller.name + " violently destroyed " + thing.name + "!"
-                    )
-                    caller.room.contents.remove(thing)
+            if util.is_room(thing):
+                thing.emit(f"{caller.name} blew up the place!")
+                for p in filter(util.is_player, thing.contents):
+                    p.send("You fall into the void of nothingness.")
+                    p.room = None
+            else:
+                caller.emit(caller.name + " violently destroyed " + thing.name + "!")
+                caller.room.contents.remove(thing)
+                caller.pockets.remove(thing)
             db.remove(thing)
             if util.is_player(thing):
                 if thing.client is not None:
@@ -584,3 +588,34 @@ class Maker(MRPower):
                     )
 
         caller.find_doit(query, doit)
+
+    # it makes sense to have this here since makers can link a room to anywhere anyway
+    # the dig/link commands would be of little use otherwise
+    def cmd_teleport(self, caller, query):
+        """teleport [to] <place>: place can be a # database ID"""
+        if query is None:
+            return caller.send("To where?")
+        place = re.match(r"(?:to )?(.*)", query).group(1)
+
+        def doit(room):
+            caller.emit(f"{caller.name} vanishes. Gone.")
+            if caller.room is not None:
+                caller.room.contents.remove(caller)
+            caller.room = room
+            room.contents.append(caller)
+            caller.cmd_look(caller, "here")
+            room.emit(f"{caller.name} pops into the room. Poof.")
+
+        if (m := re.match(r"#(\d+)", place)) is not None:
+            room = db.get(int(m.group(1)))
+            if not util.is_room(room):
+                return caller.send(f"{room} is not a room!")
+            return doit(room)
+
+        util.find_and_do(
+            caller,
+            place,
+            doit,
+            db.list_all(util.get_type("room")),
+            notfound="Don't know this place. Is it in Canada?",
+        )
