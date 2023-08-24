@@ -1,6 +1,7 @@
 import bisect
 from collections.abc import Iterable
 import queue
+import logging
 import re
 import threading
 import time
@@ -47,7 +48,11 @@ class Game:
                 pass
             else:
                 if event is not None:
-                    event()  # self-dispatching events are tight
+                    try:
+                        event()  # self-dispatching events are tight
+                    except Exception as e:
+                        logging.warning("exception in event callback: %s", repr(event), exc_info=e)
+
             self._handle_timers()
 
     def _handle_timers(self):
