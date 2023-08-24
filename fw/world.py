@@ -77,8 +77,8 @@ def game():
     return _game
 
 
-def get_db():
-    return lambda x: proxify(db.get(x))
+def get_db(x):
+    return proxify(db.get(x))
 
 
 class MRObject(BaseObject):
