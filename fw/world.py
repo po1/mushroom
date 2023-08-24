@@ -47,13 +47,18 @@ class Game:
             except queue.Empty:
                 pass
             else:
-                if event is not None:
-                    try:
-                        event()  # self-dispatching events are tight
-                    except Exception as e:
-                        logging.warning("exception in event callback: %s", repr(event), exc_info=e)
+                self._run_event(event)
 
             self._handle_timers()
+
+    def _run_event(self, event):
+        if event is not None:
+            try:
+                event()  # self-dispatching events are tight
+            except Exception as e:
+                logging.warning(
+                    "exception in event callback: %s", repr(event), exc_info=e
+                )
 
     def _handle_timers(self):
         now = time.time()
@@ -62,8 +67,7 @@ class Game:
             if when > now:
                 return
             del self._timers[0]
-            if evt is not None:
-                evt()
+            self._run_event(evt)
 
 
 _game = Game()
