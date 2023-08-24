@@ -77,6 +77,10 @@ def game():
     return _game
 
 
+def get_db():
+    return lambda x: proxify(db.get(x))
+
+
 class MRObject(BaseObject):
     """
     Base database object.
@@ -405,7 +409,7 @@ class Engineer(MRPower):
     def exec_env(self, caller):
         locs = {
             "game": game,
-            "db": lambda x: proxify(db.get(x)),
+            "db": get_db,
             "me": proxify(caller),
         }
         if caller.room is not None:
@@ -498,7 +502,9 @@ class Engineer(MRPower):
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
         def doit(thing):
-            thing.add_cmd(CustomCommand(cmd, txt, thing, env={"game": game}))
+            thing.add_cmd(
+                CustomCommand(cmd, txt, thing, env={"db": get_db, "game": game})
+            )
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
