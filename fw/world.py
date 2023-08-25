@@ -406,6 +406,11 @@ class MRPower:
     def __setstate__(self, odict):
         self.initcommands()
 
+    def __getstate__(self):
+        odict = dict(self.__dict__)
+        del odict["fwcmds"]
+        return odict
+
     def initcommands(self):
         self.fwcmds = [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
