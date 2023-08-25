@@ -61,11 +61,10 @@ class CustomCommand(BaseCommand):
 
     help_text = "No help available"
 
-    def __init__(self, name, txt, owner, env=None):
+    def __init__(self, name, txt, owner):
         self.name = name
         self.txt = txt
         self.owner = owner
-        self.env = env or {}
 
     def __repr__(self):
         txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
@@ -78,7 +77,7 @@ class CustomCommand(BaseCommand):
             "caller": proxify(caller),
             "here": proxify(caller.room),
             "query": query,
-            **self.env,
+            **caller.exec_env(),
         }
         try:
             exec(self.txt, locs)

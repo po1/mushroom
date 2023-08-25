@@ -93,9 +93,9 @@ class MRObject(BaseObject):
         super().__init__(name)
         self.description = self.default_description
         self.custom_cmds = {}
-        self.initcmds()
+        self._initcmds()
 
-    def initcmds(self):
+    def _initcmds(self):
         self.fwcmds = [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
         ]
@@ -116,13 +116,8 @@ class MRObject(BaseObject):
 
     def __setstate__(self, odict):
         self.__dict__.update(odict)
-        self.initcmds()
+        self._initcmds()
         self._checkfields()
-        self._fixparent()
-
-    def _fixparent(self):
-        for c in getattr(self, "contents", []) + getattr(self, "pockets", []):
-            c._parent = self
 
     @classmethod
     def _get_dummy(cls):
@@ -275,10 +270,6 @@ class MRPlayer(MRObject):
     def __setstate__(self, odict):
         super().__setstate__(odict)
         self.client = None
-        self._fixpockets()
-
-    def _fixpockets(self):
-        self.contents += self.__dict__.pop("pocket", [])
 
     @property
     def room(self):
@@ -324,6 +315,18 @@ class MRPlayer(MRObject):
             short_names=util.player_snames(self),
             **kwargs,
         )
+
+    def exec_env(self):
+        import fw
+
+        return {
+            "game": game,
+            "db": get_db,
+            # "unsafe" useful stuff (nothing is really safe)
+            "world": fw.world,
+            "util": fw.util,
+            "re": re,
+        }
 
     def cmd_describe(self, player, query):
         """describe <object> <description>: give a description to a room, player or thing."""
@@ -435,25 +438,13 @@ class Engineer(MRPower):
         "cmd": "cmd_cmd",
     }
 
-    def exec_env(self):
-        import fw
-
-        return {
-            "game": game,
-            "db": get_db,
-            # "unsafe" useful stuff (nothing is really safe)
-            "world": fw.world,
-            "util": fw.util,
-            "re": re,
-        }
-
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
         try:
             env = {
                 "me": proxify(caller),
                 "here": proxify(caller.room),
-                **self.exec_env(),
+                **caller.exec_env(),
             }
             caller.send(repr(eval(rest, env)))
         except Exception as e:
@@ -466,7 +457,7 @@ class Engineer(MRPower):
             env = {
                 "me": proxify(caller),
                 "here": proxify(caller.room),
-                **self.exec_env(),
+                **caller.exec_env(),
             }
             exec(util.unescape(rest), env)
         except Exception as e:
@@ -509,7 +500,7 @@ class Engineer(MRPower):
             setattr(obj, attr, value)
 
         if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))), None)
+            return doit(db.get(int(m.group(1))))
 
         caller.find_doit(target, doit)
 
@@ -525,7 +516,7 @@ class Engineer(MRPower):
             delattr(obj, attr)
 
         if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))), None)
+            return doit(db.get(int(m.group(1))))
 
         caller.find_doit(target, doit)
 
@@ -541,7 +532,7 @@ class Engineer(MRPower):
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
         def doit(thing):
-            thing.add_cmd(CustomCommand(cmd, txt, thing, env=self.exec_env()))
+            thing.add_cmd(CustomCommand(cmd, txt, thing))
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
