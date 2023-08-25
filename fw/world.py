@@ -164,6 +164,10 @@ class MRThing(MRObject):
     fancy_name = "thing"
     default_description = "A boring non-descript thing"
 
+    def __init__(self, name):
+        self.powers = []
+        super().__init__(name)
+
 
 @register
 class MRRoom(MRObject):
@@ -260,7 +264,7 @@ class MRPlayer(MRObject):
         if not (confs := db.list_all(Config)):
             db.add(Config())
             # First player gets all powers. Dibs!
-            self.powers += [Maker(), Engineer()]
+            self.powers.append(God())
         elif (default_room := confs[0].default_room) is not None:
             util.moveto(self, default_room)
 
@@ -290,6 +294,8 @@ class MRPlayer(MRObject):
         for thing in self.contents:
             if util.is_thing(thing):
                 c += thing.cmds
+                for p in getattr(thing, "powers", []):
+                    c += p.cmds
         if self.room is not None:
             c += self.room.cmds
             for thing in self.room.contents:
@@ -473,7 +479,7 @@ class Engineer(MRPower):
             )
 
         if (m := re.match(r"#(\d+)", query)) is not None:
-            return doit(db.get(int(m.group(1))), None)
+            return doit(db.get(int(m.group(1))))
 
         caller.find_doit(query, doit)
 
@@ -538,14 +544,9 @@ class Engineer(MRPower):
             caller.find_doit(target, doit)
 
 
-class Maker(MRPower):
+class Digger(MRPower):
     fw_cmds = {
         "dig": "cmd_dig",
-        "make": "cmd_make",
-        "destroy": "cmd_destroy",
-        "link": "cmd_link",
-        "unlink": "cmd_unlink",
-        "teleport": "cmd_teleport",
     }
 
     def cmd_dig(self, caller, query):
@@ -556,18 +557,30 @@ class Maker(MRPower):
             caller.send("In a flash of darkness, a new place appears around you.")
             caller.cmd_teleport(caller, query)
             return
-        caller.emit(f"{caller.name} opens a new path towards {query}")
-        self.cmd_link(caller, query)
+        room.exits.append(caller.room)
+        caller.room.exits.append(room)
+        caller.room.emit(f"{caller.name} digs a hole that leads to {room.name}")
+
+
+class SupeDigger(Digger):
+    fw_cmds = {
+        "link": "cmd_link",
+        "unlink": "cmd_unlink",
+        "teleport": "cmd_teleport",
+        **Digger.fw_cmds,
+    }
 
     def cmd_link(self, caller, query):
         """link [to] <place>: open an exit towards the place."""
+        if caller.room is None:
+            return caller.send("Bawoops, you're nowhere.")
         if query is None:
             return caller.send("Link what?")
         where = re.match(r"(?:to )?(.*)", query).group(1)
 
         def doit(arg):
-            self.exits.append(arg)
-            self.emit("Linked {} and {}".format(arg.name, self.name))
+            caller.room.exits.append(arg)
+            caller.room.emit(f"{caller.name} opens a new path towards {arg.name}")
 
         util.find_and_do(
             caller,
@@ -577,60 +590,25 @@ class Maker(MRPower):
             notfound="Don't know this place. Is it in Canada?",
         )
 
-    def cmd_unlink(self, player, rest):
+    def cmd_unlink(self, caller, rest):
         """unlink <place>: remove the exit to that place."""
+        if caller.room is None:
+            return caller.send("There's nothing here.")
 
         def doit(arg):
-            self.exits.remove(arg)
-            self.emit("Unlinked {} and {}".format(arg.name, self.name))
+            caller.room.exits.remove(arg)
+            caller.room.emit(f"{caller.name} removed the exit to {arg.name}")
 
         util.find_and_do(
-            player,
+            caller,
             rest,
             doit,
-            self.exits,
+            caller.room.exits,
             noarg="Unlink what?",
             notfound="This room ain't connected to Canada.",
         )
 
-    def cmd_make(self, caller, query):
-        """make <thing name>: make things. Just regular things."""
-        if caller.room is None:
-            return caller.send("There is nowehere to make things into.")
-        name = query
-        thing = MRThing(name)
-        db.add(thing)
-        thing.room = caller.room
-        caller.room.contents.append(thing)
-        caller.room.emit(f"{caller.name} makes {name} appear out of thin air.")
-
-    def cmd_destroy(self, caller, query):
-        """destroy <thing>: destroy things. Anything, really."""
-        if query is None:
-            return caller.send("Destroy what?")
-
-        def doit(thing):
-            if util.is_room(thing):
-                thing.emit(f"{caller.name} blew up the place!")
-                for p in filter(util.is_player, thing.contents):
-                    p.send("You fall into the void of nothingness.")
-                    p.room = None
-            else:
-                caller.emit(caller.name + " violently destroyed " + thing.name + "!")
-                caller.room.contents.remove(thing)
-                caller.pockets.remove(thing)
-            db.remove(thing)
-            if util.is_player(thing):
-                if thing.client is not None:
-                    thing.client.player = None
-                    thing.send(
-                        "Your character has been slain. You were kicked out of it"
-                    )
-
-        caller.find_doit(query, doit)
-
-    # it makes sense to have this here since makers can link a room to anywhere anyway
-    # the dig/link commands would be of little use otherwise
+    # it makes sense to keep this with link, since it can open an exit to anywhere anyway
     def cmd_teleport(self, caller, query):
         """teleport [to] <place>: place can be a # database ID"""
         if query is None:
@@ -639,10 +617,7 @@ class Maker(MRPower):
 
         def doit(room):
             caller.emit(f"{caller.name} vanishes. Gone.")
-            if caller.room is not None:
-                caller.room.contents.remove(caller)
-            caller.room = room
-            room.contents.append(caller)
+            util.moveto(caller, room)
             caller.cmd_look(caller, "here")
             room.emit(f"{caller.name} pops into the room. Poof.")
 
@@ -659,3 +634,52 @@ class Maker(MRPower):
             db.list_all(util.get_type("room")),
             notfound="Don't know this place. Is it in Canada?",
         )
+
+
+class Maker(MRPower):
+    fw_cmds = {
+        "make": "cmd_make",
+        "destroy": "cmd_destroy",
+    }
+
+    def cmd_make(self, caller, query):
+        """make <thing name>: make things. Just regular things."""
+        if caller.room is None:
+            return caller.send("There is nowehere to make things into.")
+        name = query
+        thing = MRThing(name)
+        db.add(thing)
+        util.moveto(thing, caller.room)
+        caller.room.emit(f"{caller.name} makes {name} appear out of thin air.")
+
+    def cmd_destroy(self, caller, query):
+        """destroy <thing>: destroy things. Anything, really."""
+        if query is None:
+            return caller.send("Destroy what?")
+
+        def doit(thing):
+            if util.is_room(thing):
+                thing.emit(f"{caller.name} blew up the place!")
+                for p in filter(util.is_player, thing.contents):
+                    p.send("You fall into the void of nothingness.")
+                    util.moveto(p, None)
+            else:
+                caller.emit(caller.name + " violently destroyed " + thing.name + "!")
+                util.moveto(thing, None)
+            db.remove(thing)
+            if util.is_player(thing):
+                if thing.client is not None:
+                    thing.client.player = None
+                    thing.send(
+                        "Your character has been slain. You were kicked out of it"
+                    )
+
+        caller.find_doit(query, doit)
+
+
+class God(Engineer, Maker, SupeDigger):
+    fw_cmds = {
+        **Engineer.fw_cmds,
+        **Maker.fw_cmds,
+        **SupeDigger.fw_cmds,
+    }
