@@ -122,7 +122,7 @@ class MRObject(BaseObject):
         self._fixparent()
 
     def _fixparent(self):
-        for c in getattr(self, 'contents', []) + getattr(self, "pockets", []):
+        for c in getattr(self, "contents", []) + getattr(self, "pockets", []):
             c._parent = self
 
     @classmethod
@@ -279,8 +279,7 @@ class MRPlayer(MRObject):
         self._fixpockets()
 
     def _fixpockets(self):
-        self.contents += self.pockets
-        del self.pockets
+        self.contents += self.__dict__.pop("pocket", [])
 
     @property
     def room(self):
