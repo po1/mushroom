@@ -37,7 +37,7 @@ class Database:
 
     def get_id(self, obj):
         with self.lock.r:
-            return self.ids[obj]
+            return self.ids.get(obj, None)
 
     def load(self, db_file):
         with open(db_file, "rb") as f:
