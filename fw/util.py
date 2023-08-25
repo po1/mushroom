@@ -86,6 +86,14 @@ def multiple_choice(choices):
     return "Which one?\nChoices are: " + ", ".join(names)
 
 
+def moveto(obj, container):
+    if getattr(obj, "_parent", None) is not None:
+        obj._parent.contents.remove(obj)
+    obj._parent = container
+    if container is not None:
+        container.contents.append(obj)
+
+
 def myrepr(obj, db=None):
     if type(obj) in (str, int, float, bool):
         return repr(obj)

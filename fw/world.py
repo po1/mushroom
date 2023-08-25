@@ -118,6 +118,22 @@ class MRObject(BaseObject):
     def __setstate__(self, odict):
         self.__dict__.update(odict)
         self.initcmds()
+        self._checkfields()
+        self._fixparent()
+
+    def _fixparent(self):
+        for c in getattr(self, 'contents', []) + getattr(self, "pockets", []):
+            c._parent = self
+
+    @classmethod
+    def _get_dummy(cls):
+        return cls(None)
+
+    def _checkfields(self):
+        dummy = self._get_dummy()
+        for d in dummy.__dict__:
+            if d not in self.__dict__:
+                setattr(self, d, getattr(dummy, d))
 
     @property
     def id(self):
@@ -133,8 +149,8 @@ class Config(MRObject):
     fancy_name = "config"
     default_description = "The main game config object. No big deal."
 
-    def __init__(self):
-        super().__init__("config")
+    def __init__(self, name="config"):
+        super().__init__(name)
         self.default_room = None
 
 
@@ -190,8 +206,7 @@ class MRRoom(MRObject):
 
     def cmd_take(self, caller, query):
         def doit(obj):
-            self.contents.remove(obj)
-            caller.pockets.append(obj)
+            util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
         util.find_and_do(
@@ -205,8 +220,7 @@ class MRRoom(MRObject):
 
     def cmd_drop(self, caller, query):
         def doit(obj):
-            caller.pockets.remove(obj)
-            self.contents.append(obj)
+            util.moveto(obj, caller.room)
             self.emit(
                 f"{caller.name} takes {obj.name} out of their pocket and leaves it."
             )
@@ -215,7 +229,7 @@ class MRRoom(MRObject):
             caller,
             query,
             doit,
-            caller.pockets,
+            caller.contents,
             noarg="Take what?",
             notfound="You don't have that in your pockets.",
         )
@@ -238,9 +252,9 @@ class MRPlayer(MRObject):
 
     def __init__(self, name):
         self.client = None
-        self.room = None
+        self._parent = None
         self.powers = []
-        self.pockets = []
+        self.contents = []
         super(MRPlayer, self).__init__(name)
 
         if not (confs := db.list_all(Config)):
@@ -248,8 +262,7 @@ class MRPlayer(MRObject):
             # First player gets all powers. Dibs!
             self.powers += [Maker(), Engineer()]
         elif (default_room := confs[0].default_room) is not None:
-            self.room = default_room
-            self.room.contents.append(self)
+            util.moveto(self, default_room)
 
     def __getstate__(self):
         odict = super().__getstate__()
@@ -259,13 +272,22 @@ class MRPlayer(MRObject):
     def __setstate__(self, odict):
         super().__setstate__(odict)
         self.client = None
+        self._fixpockets()
+
+    def _fixpockets(self):
+        self.contents += self.pockets
+        del self.pockets
+
+    @property
+    def room(self):
+        return getattr(self, "_parent", None)
 
     @property
     def cmds(self):
         c = super().cmds
         for p in self.powers:
             c += p.cmds
-        for thing in self.pockets:
+        for thing in self.contents:
             if util.is_thing(thing):
                 c += thing.cmds
         if self.room is not None:
@@ -284,7 +306,7 @@ class MRPlayer(MRObject):
             self.room.emit(msg)
 
     def reachable_objects(self):
-        objs = list(self.pockets)
+        objs = list(self.contents)
         if self.room is not None:
             objs += [self.room] + self.room.contents
         return objs
@@ -322,11 +344,9 @@ class MRPlayer(MRObject):
             return
 
         def doit(arg):
-            self.room.contents.remove(self)
             self.room.emit(self.name + " has gone to " + arg.name)
             arg.emit(self.name + " arrives from " + self.room.name)
-            self.room = arg
-            self.room.contents.append(self)
+            util.moveto(self, arg)
             self.cmd_look(self, "here")
 
         util.find_and_do(
