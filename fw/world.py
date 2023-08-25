@@ -22,6 +22,9 @@ class Game:
         self._loop_thread.daemon = True
         self._loop_thread.start()
 
+    def __reduce__(self):
+        return "game"  # name of the global instance for pickling
+
     def __dir__(self) -> Iterable[str]:
         return [
             x
@@ -70,11 +73,7 @@ class Game:
             self._run_event(evt)
 
 
-_game = Game()
-
-
-def game():
-    return _game
+game = Game()
 
 
 def get_db(x):
@@ -436,20 +435,26 @@ class Engineer(MRPower):
         "cmd": "cmd_cmd",
     }
 
-    def exec_env(self, caller):
-        locs = {
+    def exec_env(self):
+        import fw
+
+        return {
             "game": game,
             "db": get_db,
-            "me": proxify(caller),
+            # "unsafe" useful stuff (nothing is really safe)
+            "world": fw.world,
+            "util": fw.util,
+            "re": re,
         }
-        if caller.room is not None:
-            locs["here"] = proxify(caller.room)
-        return locs
 
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
         try:
-            env = self.exec_env(caller)
+            env = {
+                "me": proxify(caller),
+                "here": proxify(caller.room),
+                **self.exec_env(),
+            }
             caller.send(repr(eval(rest, env)))
         except Exception as e:
             cls = e.__class__.__name__
@@ -458,7 +463,11 @@ class Engineer(MRPower):
     def cmd_exec(self, caller, rest):
         """exec <string>: execute raw code."""
         try:
-            env = self.exec_env(caller)
+            env = {
+                "me": proxify(caller),
+                "here": proxify(caller.room),
+                **self.exec_env(),
+            }
             exec(util.unescape(rest), env)
         except Exception as e:
             cls = e.__class__.__name__
@@ -532,9 +541,7 @@ class Engineer(MRPower):
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
         def doit(thing):
-            thing.add_cmd(
-                CustomCommand(cmd, txt, thing, env={"db": get_db, "game": game})
-            )
+            thing.add_cmd(CustomCommand(cmd, txt, thing, env=self.exec_env()))
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:

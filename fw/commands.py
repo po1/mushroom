@@ -72,16 +72,14 @@ class CustomCommand(BaseCommand):
         return f"<code: {txt}>"
 
     def run(self, caller, query):
-        locs = dict(getattr(self, 'env', {}))
-        locs.update(
-            {
-                "send": caller.send,
-                "self": proxify(self.owner),
-                "caller": proxify(caller),
-                "here": proxify(caller.room),
-                "query": query,
-            }
-        )
+        locs = {
+            "send": caller.send,
+            "self": proxify(self.owner),
+            "caller": proxify(caller),
+            "here": proxify(caller.room),
+            "query": query,
+            **self.env,
+        }
         try:
             exec(self.txt, locs)
         except Exception as e:
