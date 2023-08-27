@@ -548,6 +548,8 @@ class Digger(MRPower):
 
     def cmd_dig(self, caller, query):
         """dig <room name>: make a new room."""
+        if not query:
+            return caller.send("Dig what? Try help dig")
         room = MRRoom(query)
         db.add(room)
         if caller.room is None:
