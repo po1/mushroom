@@ -2,6 +2,7 @@
 
 <head>
     <title>A simple netcat client</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <style>
         body {
             background-color: rgb(4, 18, 0);
@@ -11,6 +12,16 @@
         .container {
             padding: 32px;
             width: 800px;
+        }
+
+        @media only screen and (max-width: 480px) {
+            body {
+                font-size: 100%;
+            }
+            .container {
+                width: 100%;
+                padding: 0px;
+            }
         }
 
         .console {
