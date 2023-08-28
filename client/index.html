@@ -80,9 +80,9 @@
                     96: '#34e2e2',
                     97: '#ffffff',
                 };
-                const colored = input.replace(/\033\[(?:0;)?(\d+)m/gi, function (_, color) {
+                const colored = input.replace(/\033\[(?:0;)?(\d+)m/g, function (_, color) {
                     return `</span><span style="color:${mapObj[color]}">`;
-                });
+                }).replace(/\033\[0m/g, '</span><span>');
 
                 return `<span>${colored}</span>`;
             }
