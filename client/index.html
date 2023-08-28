@@ -18,6 +18,7 @@
             body {
                 font-size: 100%;
             }
+
             .container {
                 width: 100%;
                 padding: 0px;
@@ -58,6 +59,33 @@
             let ws;
             const history = [];
             let history_cursor;
+
+            function colorize(input) {
+                var mapObj = {
+                    30: '#000000',
+                    31: '#cc0000',
+                    32: '#4e9a06',
+                    33: '#c4a000',
+                    34: '#729fcf',
+                    35: '#75507b',
+                    36: '#06989a',
+                    37: '#d3d7cf',
+
+                    90: '#555753',
+                    91: '#ef2929',
+                    92: '#8ae234',
+                    93: '#fce94f',
+                    94: '#32afff',
+                    95: '#ad7fa8',
+                    96: '#34e2e2',
+                    97: '#ffffff',
+                };
+                const colored = input.replace(/\033\[(?:0;)?(\d+)m/gi, function (_, color) {
+                    return `</span><span style="color:${mapObj[color]}">`;
+                });
+
+                return `<span>${colored}</span>`;
+            }
 
             $('.input').keydown(e => {
                 if (e.key == "ArrowUp") {
@@ -113,12 +141,11 @@
                 ws.onmessage = m => {
                     m.data.text().then(text => {
                         text = text
-                            .replace(/\033[^m]+m/g, '')
                             .replaceAll('&', '&amp;')
                             .replaceAll('<', '&lt;')
                             .replaceAll('>', '&gt;');
                         const sh = $('.console-text').get(0).scrollHeight;
-                        $('.console-text').append(text).scrollTop(sh);
+                        $('.console-text').append(colorize(text)).scrollTop(sh);
                     });
                 };
             });
