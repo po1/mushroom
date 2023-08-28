@@ -3,11 +3,22 @@ import socket
 import socketserver
 import sys
 import threading
+import time
 import traceback
+from typing import Any
 
 from config import MRConfig as cfg
 from fw import Client
 from fw import Database
+
+
+class LogFile:
+    def __init__(self, log_file) -> None:
+        self.log_file = open(log_file, "a")
+
+    def __call__(self, msg) -> Any:
+        now = time.time()
+        self.log_file.write(f"[{now}] {msg}\n")
 
 
 class ClientRegister:
@@ -100,12 +111,14 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         for data in self.rfile:
             try:
                 data = data.decode("utf8")
+                if cfg.debug:
+                    self.server.log(f"data from {self.cl.name}: {repr(data)}")
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data)
             except Exception as e:
                 traceback.print_exc()
                 if cfg.debug:
-                    self.handler_write(f'{repr(e)}')
+                    self.handler_write(f"{repr(e)}")
                     continue
                 self.handler_write("An error occured. Please reconnect...\n")
                 break
@@ -228,6 +241,7 @@ if __name__ == "__main__":
     server_thread.Daemon = True
     server.running = True
     server.cr = ClientRegister()
+    server.log = LogFile(cfg.log_file)
     server_thread.start()
 
     print("Server started and ready to accept connections")

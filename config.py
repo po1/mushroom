@@ -10,3 +10,5 @@ class MRConfig:
 
     # whether to send exceptions to the player
     debug = True
+
+    log_file = "server.log"
