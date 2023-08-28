@@ -102,8 +102,11 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
                 data = data.decode("utf8")
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data)
-            except Exception:
+            except Exception as e:
                 traceback.print_exc()
+                if cfg.debug:
+                    self.handler_write(f'{repr(e)}')
+                    continue
                 self.handler_write("An error occured. Please reconnect...\n")
                 break
         print("Client disconnected: " + ip)
