@@ -204,6 +204,10 @@ class MRRoom(MRObject):
 
     def cmd_take(self, caller, query):
         def doit(obj):
+            if obj is caller:
+                return caller.emit(
+                    f"{caller.name} tries to fold themselves into their own pocket, but fails."
+                )
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
