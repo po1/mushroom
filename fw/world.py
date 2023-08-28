@@ -289,7 +289,7 @@ class MRPlayer(MRObject):
                 c += thing.cmds
                 for p in getattr(thing, "powers", []):
                     c += p.cmds
-        if self.room is not None:
+        if self.room is not None and util.is_room(self.room):
             c += self.room.cmds
             for thing in self.room.contents:
                 if util.is_thing(thing):
