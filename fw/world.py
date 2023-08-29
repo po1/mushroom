@@ -94,6 +94,7 @@ class MRObject(BaseObject):
         self.description = self.default_description
         self.custom_cmds = {}
         self._initcmds()
+        self.flags = []
 
     def _initcmds(self):
         self.fwcmds = [
@@ -208,6 +209,8 @@ class MRRoom(MRObject):
                 return caller.emit(
                     f"{caller.name} tries to fold themselves into their own pocket, but fails."
                 )
+            if 'big' in obj.flags:
+                return caller.emit(f'{obj.name} is too big.')
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
