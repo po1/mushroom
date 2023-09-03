@@ -285,7 +285,7 @@ def main():
     args = parse_args()
     cfg_override = {}
     if args.config is not None:
-        with open(args.config) as file:
+        with open(args.config, "rb") as file:
             cfg_override = tomli.load(file)
     cfg = Config(**cfg_override)
     try:
