@@ -2,13 +2,23 @@ from collections.abc import Iterable
 from typing import Any
 
 
-def proxify(obj):
-    proxy = lambda x: x
+def _proxify(obj):
+    proxy = ObjectProxy
     if isinstance(obj, BaseObject):
         return proxy(obj)
     if isinstance(obj, list):
         return [proxify(x) for x in obj]
+    if callable(obj):
+
+        def __f(*args, **kwargs):
+            return proxify(obj(*args, **kwargs))
+
+        return __f
     return obj
+
+
+# XXX: proxies are disabled for now
+proxify = lambda x: x
 
 
 class ObjectProxy:

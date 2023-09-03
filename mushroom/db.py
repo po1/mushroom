@@ -2,7 +2,7 @@ import os
 import pickle
 
 from . import util
-from .object import BaseObject
+from .object import BaseObject, proxify
 
 
 def compat_fw():
@@ -68,7 +68,7 @@ class Database:
                 pickle.dump(self.objects, f)
             os.replace(tempfile, db_file)
 
-    def search(self, name, type=BaseObject):
+    def search(self, name="", type=BaseObject):
         found = []
         with self.lock.r:
             for thing in self.objects.values():
@@ -77,10 +77,36 @@ class Database:
                         found.append(thing)
         return found
 
-    def list_all(self, type):
+    def list_all(self, type=BaseObject):
         with self.lock.r:
             return self.search("", type)
 
 
 # global instance
 db = Database()
+
+
+class DbProxy:
+    """A version of the database that's somewhat safer to use for in-game scripting."""
+
+    def __init__(self, db) -> None:
+        self.db = db
+
+    @staticmethod
+    def _prox(f):
+        def __fun(self, *args, **kwargs):
+            return proxify(f.__get__(self.db)(*args, **kwargs))
+
+        return __fun
+
+    def __repr__(self):
+        return "<Database db>"
+
+    @classmethod
+    def __dir__(cls):
+        return [x for x in cls.__dict__ if not x.startswith("_")]
+
+    get = _prox(Database.get)
+    add = _prox(Database.add)
+    remove = _prox(Database.remove)
+    search = _prox(Database.search)

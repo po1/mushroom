@@ -9,7 +9,7 @@ import time
 from . import util
 from .commands import CustomCommand
 from .commands import WrapperCommand
-from .db import db
+from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
 
@@ -74,10 +74,6 @@ class Game:
 
 
 game = Game()
-
-
-def get_db(x):
-    return proxify(db.get(x))
 
 
 class MRObject(BaseObject):
@@ -328,7 +324,7 @@ class MRPlayer(MRObject):
 
         return {
             "game": game,
-            "db": get_db,
+            "db": DbProxy(db),
             # "unsafe" useful stuff (nothing is really safe)
             "world": mushroom.world,
             "util": mushroom.util,
