@@ -324,14 +324,14 @@ class MRPlayer(MRObject):
         )
 
     def exec_env(self):
-        import fw
+        import mushroom
 
         return {
             "game": game,
             "db": get_db,
             # "unsafe" useful stuff (nothing is really safe)
-            "world": fw.world,
-            "util": fw.util,
+            "world": mushroom.world,
+            "util": mushroom.util,
             "re": re,
         }
 
@@ -637,7 +637,7 @@ class SupeDigger(Digger):
             caller,
             place,
             doit,
-            db.list_all(util.get_type("room")),
+            db.list_all(MRRoom),
             notfound="Don't know this place. Is it in Canada?",
         )
 

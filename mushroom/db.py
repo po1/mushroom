@@ -5,6 +5,19 @@ from . import util
 from .object import BaseObject
 
 
+def compat_fw():
+    # register all classes
+    from . import world
+
+    # old objects have fw.world.* classes
+    import sys
+
+    for module in list(sys.modules):
+        if module.startswith("mushroom"):
+            oldmodule = module.replace("mushroom", "fw")
+            sys.modules[oldmodule] = sys.modules[module]
+
+
 class Database:
     """The database holding the world."""
 
@@ -40,6 +53,7 @@ class Database:
             return self.ids.get(obj, None)
 
     def load(self, db_file):
+        compat_fw()
         with open(db_file, "rb") as f:
             self.objects = pickle.load(f)
             if self.objects:

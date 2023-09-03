@@ -1,5 +1,4 @@
 from . import util
-
 from .db import db
 from .register import get_type
 from .commands import BaseCommand
@@ -65,12 +64,7 @@ class HelpCommand(BaseCommand):
         caller.send(f"{cmd.help_text}")
 
 
-class MRClient:
-    """
-    This class is one of the only interfaces
-    between the FW and the server.
-    """
-
+class Client:
     fw_cmds = [
         HelpCommand,
         PlayCommand,

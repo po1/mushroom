@@ -1,4 +1,6 @@
+import argparse
 import importlib
+import logging
 import socket
 import socketserver
 import sys
@@ -7,9 +9,10 @@ import time
 import traceback
 from typing import Any
 
-from config import MRConfig as cfg
-from fw import Client
-from fw import Database
+import tomli
+
+from .client import Client
+from .config import Config
 
 
 class LogFile:
@@ -71,9 +74,6 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
     which are FW-independant
     """
 
-    scommand_letter = cfg.op_command_prefix
-    sc_password = cfg.op_password
-
     scmds = {
         "help": "scmd_help",
         "reload": "scmd_reload",
@@ -102,34 +102,34 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         self.silent = False
         self.op = False
 
-        print("New client: " + ip)
+        logging.info(f"New client: {ip}")
         try:
-            with open(cfg.motd_file, "r") as f:
+            with open(self.server.cfg.motd_file, "r") as f:
                 self.handler_write(f.read())
         except OSError:
             self.handler_write("Welcome!\n")
         for data in self.rfile:
             try:
                 data = data.decode("utf8")
-                if cfg.debug:
+                if self.server.cfg.debug:
                     self.server.log(f"data from {self.cl.name}: {repr(data)}")
                 if not self.handle_scommands(data):
                     self.cl.handle_input(data)
             except Exception as e:
                 traceback.print_exc()
-                if cfg.debug:
+                if self.server.cfg.debug:
                     self.handler_write(f"{repr(e)}")
                     continue
                 self.handler_write("An error occured. Please reconnect...\n")
                 break
-        print("Client disconnected: " + ip)
+        logging.info(f"Client disconnected: {ip}")
         self.cl.on_disconnect()
         self.server.cr.delete(self.cl)
         if not self.silent:
             self.server.cr.broadcast(self.cl.name + " has quit.")
 
     def handle_scommands(self, data):
-        op_command_prefix = cfg.op_command_prefix
+        op_command_prefix = self.server.cfg.op_command_prefix
         words = data.split()
         if len(words) < 1:
             return True  # no need to parse that further
@@ -151,7 +151,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return True
 
     def scmd_login(self, rest):
-        if rest == cfg.op_password:
+        if rest == self.server.cfg.op_password:
             self.op = True
             self.handler_write("Successflly logged as operator\n")
             return True
@@ -172,7 +172,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return False
 
     def scmd_shutdown(self, rest):
-        print("Shutdown request by " + self.cl.name)
+        logging.info(f"Shutdown request by {self.cl.name}")
         self.handler_write("Shutting down\n")
         self.server.running = False
         return True
@@ -193,13 +193,13 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return True
 
     def scmd_save(self, rest):
-        Database.dump(cfg.db_file)
+        self.server.db.dump(self.server.cfg.db_file)
         self.handler_write("Database saved\n")
         return True
 
     def scmd_load(self, rest):
         try:
-            Database.load(cfg.db_file)
+            self.server.db.load(self.server.cfg.db_file)
             self.handler_write("Database loaded\n")
         except IOError:
             self.handler_write("Could not load: database not found.\n")
@@ -229,37 +229,74 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
 
-if __name__ == "__main__":
-    HOST, PORT = cfg.listen_address, cfg.listen_port
+class Server:
+    def __init__(self, config, db):
+        self.config = config
+        self.db = db
+        self.start()
 
-    server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
+    def start(self):
+        HOST = self.config.listen_address
+        PORT = self.config.listen_port
 
-    # Start a thread with the server -- that thread will then start one
-    # more thread for each request
-    server_thread = threading.Thread(target=server.serve_forever)
-    # Exit the server thread when the main thread terminates
-    server_thread.Daemon = True
-    server.running = True
-    server.cr = ClientRegister()
-    server.log = LogFile(cfg.log_file)
-    server_thread.start()
+        self.server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
 
-    print("Server started and ready to accept connections")
-    print("Loading database...")
+        # Start a thread with the server -- that thread will then start one
+        # more thread for each request
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        # Exit the server thread when the main thread terminates
+        self.server_thread.Daemon = True
+        self.server.running = True
+        self.server.cr = ClientRegister()
+        self.server.log = LogFile(self.config.log_file)
+        self.server.db = self.db
+        self.server.cfg = self.config
+        self.server_thread.start()
 
+        logging.info("Server started and ready to accept connections")
+        logging.info("Loading database...")
+
+    def serve_forever(self):
+        # Wait for a user shutdown
+        try:
+            while self.server.running:
+                self.server_thread.join(1)
+        except KeyboardInterrupt:
+            logging.info("Got SIGINT, closing the server...")
+        self.server.cr.broadcast("Shutting down...")
+        self.server.cr.shutdown()
+        self.server.shutdown()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Launch a mushroom server.")
+    parser.add_argument("--config", "-c", help="path to a config.toml")
+
+    return parser.parse_args()
+
+
+def main():
+    logging.basicConfig()
+
+    from .db import db as global_db
+
+    db = global_db  # XXX: switch to a non-local DB eventually
+
+    args = parse_args()
+    cfg_override = {}
+    if args.config is not None:
+        with open(args.config) as file:
+            cfg_override = tomli.load(file)
+    cfg = Config(**cfg_override)
     try:
-        Database.load(cfg.db_file)
+        db.load(cfg.db_file)
         print("Database successfully loaded")
     except IOError:
         print("Database not found")
 
-    # Wait for a user shutdown
-    try:
-        while server.running:
-            server_thread.join(1)
-    except KeyboardInterrupt:
-        print("\nGot SIGINT, closing the server...")
+    server = Server(cfg, db)
+    server.serve_forever()
 
-    server.cr.broadcast("Shutting down...")
-    server.cr.shutdown()
-    server.shutdown()
+
+if __name__ == "__main__":
+    main()

@@ -1,18 +1,19 @@
 MUSHRoom
--- 0.2 "boletus"
+-- 0.3 "cep"
 
 MUSHRoom is a tool to create and host a MUSH.
 You will need python3 to launch the server.
 
 A MUSH is a text-mode game, the server will be reachable by telnet, netcat,
 and other very simple TCP/IP text clients. The default port is 1337.
-You can change it in the `config.py`
+You can change it in a `config.toml` file.
 
 Launching the server:
 --------------------
 
 ```
-python3 server.py
+pip install .
+mushroomd
 ```
 
 
@@ -23,21 +24,32 @@ Connecting to the game:
 nc hostname 1337
 ```
 
-
-If you want better handling of typed commands, with history, give a look at
-MRClient: https://github.com/po1/mrclient
+You can also launch the websocket proxy and use the HTML client:
+```
+cd client && node index.js
+```
+Then point your browser to `client/index.html`, click connect. Enjoy.
 
 
 Contributing
 ============
 
-Join us on IRC: irc://aerith.ponteilla.net/#pno
-We also have a document to help us with the developpement:
-http://aerith.ponteilla.net:9001/p/mushroom
+Send PRs!
+Since I'm mostly alone developing this, there's no real roadmap / design doc. Open issues for bugs / feature requests.
 
 
 Changelog
 =========
+
+0.3.0 (2023-09-03)
+------------------
+* Command refactor
+* More power(s)
+* Refactors, more refactors
+* Now a nice packageable... package
+* A tiny bit of onboarding: global config, god player...
+* Shiny new HTML client!
+* Contributors: Paul
 
 0.2.0 (2014-11-29)
 ------------------
