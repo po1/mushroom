@@ -442,17 +442,23 @@ class Engineer(MRPower):
         "setattr": "cmd_setattr",
         "delattr": "cmd_delattr",
         "cmd": "cmd_cmd",
+        "setflag": "cmd_setflag",
+        "resetflag": "cmd_resetflag",
     }
+
+    def _exec_env(self, caller):
+        return {
+            "self": proxify(caller),
+            "find": lambda w: proxify(
+                util.match_list(w, caller.reachable_objects())[0]
+            ),
+            **caller.exec_env(),
+        }
 
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
         try:
-            env = {
-                "me": proxify(caller),
-                "here": proxify(caller.room),
-                **caller.exec_env(),
-            }
-            caller.send(repr(eval(rest, env)))
+            caller.send(repr(eval(rest, self._exec_env(caller))))
         except Exception as e:
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
@@ -460,12 +466,7 @@ class Engineer(MRPower):
     def cmd_exec(self, caller, rest):
         """exec <string>: execute raw code."""
         try:
-            env = {
-                "me": proxify(caller),
-                "here": proxify(caller.room),
-                **caller.exec_env(),
-            }
-            exec(util.unescape(rest), env)
+            exec(util.unescape(rest), self._exec_env(caller))
         except Exception as e:
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
@@ -545,6 +546,40 @@ class Engineer(MRPower):
             doit(db.get(int(m.group(1))))
         else:
             caller.find_doit(target, doit)
+
+    def cmd_setflag(self, caller, query):
+        """setflag <object> <flag>: set a flag on an object.
+        <object> can be a # database ID."""
+        if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
+            return caller.send("Try help setflag")
+
+        target, flag = match.groups()
+
+        def doit(obj):
+            if not flag in obj.flags:
+                obj.flags.append(flag)
+
+        if (m := re.match(r"#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+
+        caller.find_doit(target, doit)
+
+    def cmd_resetflag(self, caller, query):
+        """resetflag <object> <flag>: reset a flag on an object.
+        <object> can be a # database ID."""
+        if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
+            return caller.send("Try help setflag")
+
+        target, flag = match.groups()
+
+        def doit(obj):
+            if flag in obj.flags:
+                obj.flags.remove(flag)
+
+        if (m := re.match(r"#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+
+        caller.find_doit(target, doit)
 
 
 class Digger(MRPower):
