@@ -209,8 +209,8 @@ class MRRoom(MRObject):
                 return caller.emit(
                     f"{caller.name} tries to fold themselves into their own pocket, but fails."
                 )
-            if 'big' in obj.flags:
-                return caller.emit(f'{obj.name} is too big.')
+            if "big" in obj.flags:
+                return caller.emit(f"{obj.name} is too big.")
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
@@ -379,19 +379,18 @@ class MRPlayer(MRObject):
                 self.send("You only see nothing. A lot of nothing.")
                 return
             self.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
-            if util.is_room(arg):
+            if hasattr(arg, "contents") and "opaque" not in arg.flags:
                 self.send("")  # extra newline
-                if len(arg.contents) == 0:
-                    self.send("It is empty")
-                else:
+                if arg.contents:
                     self.send("Contents:")
                 for thing in arg.contents:
                     self.send(" - " + thing.name)
-                if len(arg.exits) > 0:
+            if hasattr(arg, "exits") and "opaque" not in arg.flags:
+                self.send("")  # extra newline
+                if arg.exits:
                     self.send("Nearby places:")
                 for room in arg.exits:
                     self.send(" - " + room.name)
-                self.send("")
 
         if self.room is None:
             notfound = "You see nothing but you."
