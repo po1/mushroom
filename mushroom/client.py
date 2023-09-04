@@ -14,11 +14,15 @@ class PlayCommand(BaseCommand):
     )
 
     def create_character(self, caller, name):
+        caller.add_cmd(self)
         char = get_type("player")(name)
         db.add(char)
         self.play(caller, char)
 
     def play(self, caller, char):
+        if char.client is not None:
+            caller.send(f"{char.name} is already online.")
+            return
         caller.player = char
         char.client = caller
         caller.remove_cmd(self)
@@ -36,8 +40,13 @@ class PlayCommand(BaseCommand):
             caller.send(
                 "Couldn't find a character named {}.\n" "Create it?".format(query)
             )
+            caller.remove_cmd(self)
             add_answer_to(
-                YesNoAnswer(lambda x: self.create_character(x, query), None), caller
+                YesNoAnswer(
+                    lambda x: self.create_character(x, query),
+                    lambda _: caller.add_cmd(self),
+                ),
+                caller,
             )
             return
         self.play(caller, matchs[0])
