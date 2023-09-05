@@ -3,7 +3,7 @@ import logging
 from . import util
 from .db import db
 from .register import get_type
-from .commands import BaseCommand
+from .commands import BaseCommand, ActionFailed
 from .commands import add_answer_to, YesNoAnswer
 
 
@@ -122,7 +122,11 @@ class Client:
         cmds = self.available_cmds()
         caller = self.player or self
         for cmd in cmds:
-            if cmd.match(caller, data.strip()):
+            try:
+                if cmd.match(caller, data.strip()):
+                    return
+            except ActionFailed as e:
+                self.send(str(e))
                 return
         self.send("Huh?")
 

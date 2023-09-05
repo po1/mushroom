@@ -5,6 +5,10 @@ import re
 from .object import proxify
 
 
+class ActionFailed(Exception):
+    pass
+
+
 def run_code(caller, code, owner=None, **kwargs):
     locs = {
         "send": caller.send,
@@ -16,6 +20,8 @@ def run_code(caller, code, owner=None, **kwargs):
     }
     try:
         exec(code, locs)
+    except ActionFailed as e:
+        caller.send(str(e))
     except Exception as e:
         caller.send(f"command failed: ({e.__class__.__name__}) {e}")
 

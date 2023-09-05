@@ -7,7 +7,7 @@ import threading
 import time
 
 from . import util
-from .commands import CustomCommand, RegexpAction, WrapperCommand
+from .commands import CustomCommand, RegexpAction, WrapperCommand, ActionFailed
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
@@ -300,15 +300,20 @@ class MRPlayer(MRObject):
         return custom_cmds + fw_cmds
 
     def find(
-        self, query="", objects=None, quiet=False, then=None, none=None, multiple=None
+        self,
+        query="",
+        objects=None,
+        quiet=False,
+        then=None,
     ):
         def found(results):
-            if not results and none is not None:
-                none()
-            elif len(results) == 1 and then is not None:
+            if not quiet:
+                if not results:
+                    raise ActionFailed(f"You see nothing like '{query}' here.")
+                if len(results) > 1:
+                    raise ActionFailed(util.multiple_choice(results))
+            if len(results) == 1 and then is not None:
                 then(results[0])
-            elif len(results) > 1 and multiple is not None:
-                multiple(results)
             return results
 
         if objects is None:
@@ -316,21 +321,18 @@ class MRPlayer(MRObject):
         short_names = {"me": self, "here": self.room}
         if query in short_names:
             return found([short_names[query]])
-
-        if not quiet:
-            none = none or (lambda: self.send(f"You see nothing like '{query}' here."))
-            multiple = multiple or (lambda f: self.send(util.multiple_choice(f)))
-
         return found(util.match_list(query, objects))
 
     def move(self, object, destination):
         caller = self  # XXX: caller is assumed to be 'self'
         if not util.is_thing(object):
-            return caller.send(f'Can not move {object.name}.')
-        if not hasattr(destination, 'contents'):
-            return caller.send(f'{destination.name} has no room for {object.name}')
-        if 'big' in object.flags:
-            return caller.send(f'{object.name} is too big')
+            raise ActionFailed(f"Can not move {object.name}.")
+        if not hasattr(destination, "contents"):
+            raise ActionFailed(f"{destination.name} has no room for {object.name}")
+        if "big" in object.flags:
+            raise ActionFailed(f"{object.name} is too big.")
+        if object is destination:
+            raise ActionFailed(f"Can not move into itself.")
         util.moveto(object, destination)
 
     def send(self, msg):
@@ -560,7 +562,7 @@ class Engineer(MRPower):
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
         def doit(thing):
-            thing.add_cmd(CustomCommand(cmd, txt, thing))
+            thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing)
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
@@ -569,15 +571,17 @@ class Engineer(MRPower):
             caller.find(target, then=doit)
 
     def cmd_match(self, caller, query):
-        """match <object> <match regexp> <code>: add a matcher to an object.
+        """match <object> [<name>:]<match regexp> <code>: add a matcher to an object.
         <object> can be a # database ID."""
-        m = re.match("(.*) (\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
+        m = re.match("(.*) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
         if m is None:
             return caller.send("Try help match")
-        target, regex, code = m.groups()
+        target, name, regex, code = m.groups()
 
         def doit(target):
-            target.add_cmd(RegexpAction(regex[1:-1], code, owner=target))
+            action = RegexpAction(regex[1:-1], code, owner=target, name=name)
+            target.custom_cmds[action.name] = action
+            caller.send(f"Added match command {action.name} to {target.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
