@@ -1,6 +1,7 @@
 import bisect
 from collections.abc import Iterable
 import queue
+import itertools
 import logging
 import re
 import threading
@@ -90,6 +91,9 @@ class MRObject(BaseObject):
         self.custom_cmds = {}
         self._initcmds()
         self.flags = []
+
+    def has_flag(self, flag):
+        return flag in self.flags
 
     def _initcmds(self):
         self._fwcmds = [
@@ -269,6 +273,18 @@ class MRPlayer(MRObject):
         super().__setstate__(odict)
         self.client = None
 
+    def has_flag(self, flag):
+        powerflags = itertools.chain(*(p.flags for p in self.get_powers()))
+        return flag in self.flags or flag in powerflags
+
+    def get_powers(self):
+        pows = list(self.powers)
+        for thing in self.contents:
+            if not util.is_thing(thing):
+                continue
+            pows.extend(thing.powers)
+        return pows
+
     @property
     def room(self):
         return getattr(self, "_parent", None)
@@ -277,23 +293,18 @@ class MRPlayer(MRObject):
     def cmds(self):
         fw_cmds = list(self._fwcmds)
         custom_cmds = list(self.custom_cmds.values())
-        for p in self.powers:
+        for p in self.get_powers():
             fw_cmds += p._fwcmds  # no custom commands on powers yet
 
-        def addthingcmds(container, get_powers=False):
+        def addthingcmds(container):
             for thing in container.contents:
                 if util.is_thing(thing):
                     fw_cmds.extend(thing._fwcmds)
                     custom_cmds.extend(thing.custom_cmds.values())
-                    if get_powers:
-                        for p in getattr(thing, "powers", []):
-                            fw_cmds.extend(
-                                p._fwcmds
-                            )  # still no custom commands on powers
             fw_cmds.extend(container._fwcmds)
             custom_cmds.extend(container.custom_cmds.values())
 
-        addthingcmds(self, get_powers=True)
+        addthingcmds(self)
         if self.room is not None:
             addthingcmds(self.room)
 
@@ -329,7 +340,7 @@ class MRPlayer(MRObject):
             raise ActionFailed(f"Can not move {object.name}.")
         if not hasattr(destination, "contents"):
             raise ActionFailed(f"{destination.name} has no room for {object.name}")
-        if "big" in object.flags:
+        if object.has_flag("big"):
             raise ActionFailed(f"{object.name} is too big.")
         if object is destination:
             raise ActionFailed(f"Can not move into itself.")
@@ -408,13 +419,13 @@ class MRPlayer(MRObject):
                 self.send("You only see nothing. A lot of nothing.")
                 return
             self.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
-            if hasattr(arg, "contents") and "opaque" not in arg.flags:
+            if hasattr(arg, "contents") and not arg.has_flag("opaque"):
                 self.send("")  # extra newline
                 if arg.contents:
                     self.send("Contents:")
                 for thing in arg.contents:
                     self.send(" - " + thing.name)
-            if hasattr(arg, "exits") and "opaque" not in arg.flags:
+            if hasattr(arg, "exits") and not arg.has_flag("opaque"):
                 self.send("")  # extra newline
                 if arg.exits:
                     self.send("Nearby places:")
@@ -438,6 +449,7 @@ class MRPlayer(MRObject):
 
 class MRPower:
     fw_cmds = {}
+    flags = []
 
     def __init__(self):
         self.initcommands()
