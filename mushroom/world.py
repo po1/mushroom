@@ -460,7 +460,10 @@ class Engineer(MRPower):
     }
 
     def _exec_env(self, caller):
-        return caller.exec_env()
+        return {
+            "self": proxify(caller),
+            **caller.exec_env(),
+        }
 
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
