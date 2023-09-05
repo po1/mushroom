@@ -92,7 +92,7 @@ class MRObject(BaseObject):
         self.flags = []
 
     def _initcmds(self):
-        self.fwcmds = [
+        self._fwcmds = [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
         ]
 
@@ -107,7 +107,7 @@ class MRObject(BaseObject):
 
     def __getstate__(self):
         odict = dict(self.__dict__)
-        del odict["fwcmds"]
+        del odict["_fwcmds"]
         return odict
 
     def __setstate__(self, odict):
@@ -128,10 +128,6 @@ class MRObject(BaseObject):
     @property
     def id(self):
         return db.get_id(self)
-
-    @property
-    def cmds(self):
-        return self.fwcmds + list(self.custom_cmds.values())
 
 
 @register
@@ -279,20 +275,29 @@ class MRPlayer(MRObject):
 
     @property
     def cmds(self):
-        c = super().cmds
+        fw_cmds = list(self._fwcmds)
+        custom_cmds = list(self.custom_cmds.values())
         for p in self.powers:
-            c += p.cmds
-        for thing in self.contents:
-            if util.is_thing(thing):
-                c += thing.cmds
-                for p in getattr(thing, "powers", []):
-                    c += p.cmds
-        if self.room is not None and util.is_room(self.room):
-            c += self.room.cmds
-            for thing in self.room.contents:
+            fw_cmds += p._fwcmds  # no custom commands on powers yet
+
+        def addthingcmds(container, get_powers=False):
+            for thing in container.contents:
                 if util.is_thing(thing):
-                    c += thing.cmds
-        return c
+                    fw_cmds.extend(thing._fwcmds)
+                    custom_cmds.extend(thing.custom_cmds.values())
+                    if get_powers:
+                        for p in getattr(thing, "powers", []):
+                            fw_cmds.extend(
+                                p._fwcmds
+                            )  # still no custom commands on powers
+            fw_cmds.extend(container._fwcmds)
+            custom_cmds.extend(container.custom_cmds.values())
+
+        addthingcmds(self, get_powers=True)
+        if self.room is not None:
+            addthingcmds(self.room)
+
+        return custom_cmds + fw_cmds
 
     def find(
         self, query="", objects=None, quiet=False, then=None, none=None, multiple=None
@@ -433,17 +438,13 @@ class MRPower:
 
     def __getstate__(self):
         odict = dict(self.__dict__)
-        del odict["fwcmds"]
+        del odict["_fwcmds"]
         return odict
 
     def initcommands(self):
-        self.fwcmds = [
+        self._fwcmds = [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
         ]
-
-    @property
-    def cmds(self):
-        return self.fwcmds
 
 
 class Engineer(MRPower):
