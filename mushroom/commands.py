@@ -41,12 +41,15 @@ class Action:
 
 
 class RegexpAction(Action):
-    def __init__(self, regexp, code, owner=None):
+    def __init__(self, regexp, code, name=None, owner=None):
         self.regexp = re.compile(regexp)
         self.code = code
         self.owner = owner
-        self.name = regexp.split()[0]
+        self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
+
+    def __repr__(self) -> str:
+        return f"<match {self.name}: {repr(self.regexp.pattern)} -> {self.code}>"
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
@@ -104,7 +107,7 @@ class CustomCommand(BaseCommand):
 
     def __repr__(self):
         txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
-        return f"<code: {txt}>"
+        return f"<cmd {self.name}: {txt}>"
 
     def run(self, caller, query):
         run_code(caller, self.txt, owner=self.owner, query=query)

@@ -102,8 +102,8 @@ class MRObject(BaseObject):
     def __repr__(self):
         return f"<#{self.id} {self.fancy_name} {self.name}>"
 
-    def add_cmd(self, cmd):
-        self.custom_cmds[cmd.name] = cmd
+    def __str__(self):
+        return self.name
 
     def __getstate__(self):
         odict = dict(self.__dict__)
