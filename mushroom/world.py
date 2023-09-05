@@ -7,8 +7,7 @@ import threading
 import time
 
 from . import util
-from .commands import CustomCommand
-from .commands import WrapperCommand
+from .commands import CustomCommand, RegexpAction, WrapperCommand
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
@@ -295,6 +294,30 @@ class MRPlayer(MRObject):
                     c += thing.cmds
         return c
 
+    def find(
+        self, query="", objects=None, quiet=False, then=None, none=None, multiple=None
+    ):
+        def found(results):
+            if not results and none is not None:
+                none()
+            elif len(results) == 1 and then is not None:
+                then(results[0])
+            elif len(results) > 1 and multiple is not None:
+                multiple(results)
+            return results
+
+        if objects is None:
+            objects = self.reachable_objects()
+        short_names = {"me": self, "here": self.room}
+        if query in short_names:
+            return found([short_names[query]])
+
+        if not quiet:
+            none = none or (lambda: self.send(f"You see nothing like '{query}' here."))
+            multiple = multiple or (lambda f: self.send(util.multiple_choice(f)))
+
+        return found(util.match_list(query, objects))
+
     def send(self, msg):
         if self.client is not None:
             self.client.send(msg)
@@ -309,15 +332,8 @@ class MRPlayer(MRObject):
             objs += [self.room] + self.room.contents
         return objs
 
-    def find_doit(self, rest, dofun, **kwargs):
-        util.find_and_do(
-            self,
-            rest,
-            dofun,
-            self.reachable_objects(),
-            short_names=util.player_snames(self),
-            **kwargs,
-        )
+    def find_doit(self, query, dofun):
+        self.find(query, then=dofun)
 
     def exec_env(self):
         import mushroom
@@ -341,7 +357,7 @@ class MRPlayer(MRObject):
             thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
             self.send("Added description of {}".format(thing.name))
 
-        self.find_doit(what, doit)
+        self.find(what, then=doit)
 
     def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
@@ -438,18 +454,13 @@ class Engineer(MRPower):
         "setattr": "cmd_setattr",
         "delattr": "cmd_delattr",
         "cmd": "cmd_cmd",
+        "match": "cmd_match",
         "setflag": "cmd_setflag",
         "resetflag": "cmd_resetflag",
     }
 
     def _exec_env(self, caller):
-        return {
-            "self": proxify(caller),
-            "find": lambda w: proxify(
-                util.match_list(w, caller.reachable_objects())[0]
-            ),
-            **caller.exec_env(),
-        }
+        return caller.exec_env()
 
     def cmd_eval(self, caller, rest):
         """eval <string>: evaluate the string as raw code."""
@@ -483,7 +494,7 @@ class Engineer(MRPower):
         if (m := re.match(r"#(\d+)", query)) is not None:
             return doit(db.get(int(m.group(1))))
 
-        caller.find_doit(query, doit)
+        caller.find(query, then=doit)
 
     def cmd_setattr(self, caller, query):
         """setattr <object> <attribute> <value>: set an attribute on an object.
@@ -505,7 +516,7 @@ class Engineer(MRPower):
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
 
-        caller.find_doit(target, doit)
+        caller.find(target, then=doit)
 
     def cmd_delattr(self, caller, query):
         """delattr <object> <attribute>: delete an attribute on an object.
@@ -521,7 +532,7 @@ class Engineer(MRPower):
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
 
-        caller.find_doit(target, doit)
+        caller.find(target, then=doit)
 
     def cmd_cmd(self, caller, query):
         """cmd <object> <cmd> <code>: add a command to an object."""
@@ -541,7 +552,22 @@ class Engineer(MRPower):
         if (m := re.match("#(\d+)", target)) is not None:
             doit(db.get(int(m.group(1))))
         else:
-            caller.find_doit(target, doit)
+            caller.find(target, then=doit)
+
+    def cmd_match(self, caller, query):
+        """match <object> <match regexp> <code>: add a matcher to an object.
+        <object> can be a # database ID."""
+        m = re.match("(.*) (\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
+        if m is None:
+            return caller.send("Try help match")
+        target, regex, code = m.groups()
+
+        def doit(target):
+            target.add_cmd(RegexpAction(regex[1:-1], code, owner=target))
+
+        if (m := re.match("#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+        return caller.find(target, then=doit)
 
     def cmd_setflag(self, caller, query):
         """setflag <object> <flag>: set a flag on an object.
@@ -558,7 +584,7 @@ class Engineer(MRPower):
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
 
-        caller.find_doit(target, doit)
+        caller.find(target, then=doit)
 
     def cmd_resetflag(self, caller, query):
         """resetflag <object> <flag>: reset a flag on an object.
@@ -575,7 +601,7 @@ class Engineer(MRPower):
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
 
-        caller.find_doit(target, doit)
+        caller.find(target, then=doit)
 
 
 class Digger(MRPower):

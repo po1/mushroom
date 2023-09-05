@@ -21,6 +21,10 @@ def is_player(thing):
 
 
 def match_name(short, name):
+    # allow matching individual words of the name
+    for word in name.split():
+        if short.lower() == word[: len(short)].lower():
+            return True
     if short.lower() == name[: len(short)].lower():
         return True
     return False

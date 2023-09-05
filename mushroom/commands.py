@@ -5,6 +5,21 @@ import re
 from .object import proxify
 
 
+def run_code(caller, code, owner=None, **kwargs):
+    locs = {
+        "send": caller.send,
+        "self": proxify(owner),
+        "caller": proxify(caller),
+        "here": proxify(caller.room),
+        **caller.exec_env(),
+        **kwargs,
+    }
+    try:
+        exec(code, locs)
+    except Exception as e:
+        caller.send(f"command failed: ({e.__class__.__name__}) {e}")
+
+
 class Caller:
     def send(self, text):
         pass
@@ -16,6 +31,21 @@ class Action:
 
         Returns True if there was a match, False otherwise.
         """
+        return False
+
+
+class RegexpAction(Action):
+    def __init__(self, regexp, code, owner=None):
+        self.regexp = re.compile(regexp)
+        self.code = code
+        self.owner = owner
+        self.name = regexp.split()[0]
+        self.help_text = regexp
+
+    def match(self, caller, query):
+        if (m := self.regexp.match(query)) is not None:
+            run_code(caller, self.code, owner=self.owner, groups=m.groups())
+            return True
         return False
 
 
@@ -71,18 +101,7 @@ class CustomCommand(BaseCommand):
         return f"<code: {txt}>"
 
     def run(self, caller, query):
-        locs = {
-            "send": caller.send,
-            "self": proxify(self.owner),
-            "caller": proxify(caller),
-            "here": proxify(caller.room),
-            "query": query,
-            **caller.exec_env(),
-        }
-        try:
-            exec(self.txt, locs)
-        except Exception as e:
-            caller.send(f"command {self.name} failed: ({e.__class__.__name__}) {e}")
+        run_code(caller, self.txt, owner=self.owner, query=query)
 
 
 class Answer(Action):
