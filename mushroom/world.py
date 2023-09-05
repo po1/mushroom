@@ -514,7 +514,7 @@ class Engineer(MRPower):
 
         def doit(obj):
             what = proxify(obj)
-            caller.send(f"{what}:")
+            caller.send(f"{repr(what)}:")
             caller.send(
                 "\n".join(f"  {k}: {repr(getattr(what, k))}" for k in dir(what))
             )
