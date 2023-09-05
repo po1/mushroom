@@ -598,7 +598,7 @@ class Digger(MRPower):
         caller.room.emit(f"{caller.name} digs a hole that leads to {room.name}")
 
 
-class SupeDigger(Digger):
+class SuperDigger(Digger):
     fw_cmds = {
         "link": "cmd_link",
         "unlink": "cmd_unlink",
@@ -710,12 +710,12 @@ class Maker(MRPower):
                         "Your character has been slain. You were kicked out of it"
                     )
 
-        caller.find_doit(query, doit)
+        caller.find(query, then=doit)
 
 
-class God(Engineer, Maker, SupeDigger):
+class God(Engineer, Maker, SuperDigger):
     fw_cmds = {
         **Engineer.fw_cmds,
         **Maker.fw_cmds,
-        **SupeDigger.fw_cmds,
+        **SuperDigger.fw_cmds,
     }

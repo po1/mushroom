@@ -1,3 +1,5 @@
+import logging
+
 from . import util
 from .db import db
 from .register import get_type
@@ -101,7 +103,7 @@ class Client:
         try:
             self.handler.handler_write((msg + "\n"))
         except IOError:
-            util.log_err(f"Could not send to {self.name}")
+            logging.error(f"Could not send to {self.name}")
 
     def broadcast(self, msg):
         self.handler.broadcast(f"{msg}\n")
