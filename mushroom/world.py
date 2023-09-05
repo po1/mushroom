@@ -323,6 +323,16 @@ class MRPlayer(MRObject):
 
         return found(util.match_list(query, objects))
 
+    def move(self, object, destination):
+        caller = self  # XXX: caller is assumed to be 'self'
+        if not util.is_thing(object):
+            return caller.send(f'Can not move {object.name}.')
+        if not hasattr(destination, 'contents'):
+            return caller.send(f'{destination.name} has no room for {object.name}')
+        if 'big' in object.flags:
+            return caller.send(f'{object.name} is too big')
+        util.moveto(object, destination)
+
     def send(self, msg):
         if self.client is not None:
             self.client.send(msg)
