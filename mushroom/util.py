@@ -1,6 +1,7 @@
 import re
 import threading
 
+from .commands import ActionFailed
 from .register import get_type
 
 
@@ -41,31 +42,31 @@ def player_snames(player, allow_no_room=False):
     return sn
 
 
-def find_and_do(
-    player,
-    what,
-    dofun,
-    search_list,
-    arg_default=None,
+def find(
+    query="",
+    objects=None,
+    quiet=False,
     short_names=None,
-    noarg="Pardon?",
-    notfound="You see nothing like '{}' here.",
+    then=None,
+    notfound=None,
 ):
-    what = what or arg_default
-    if what is None:
-        player.send(noarg)
-        return
-    found = match_list(what, search_list)
+    def found(results):
+        if not quiet:
+            if not results:
+                raise ActionFailed(notfound or f"You see nothing like '{query}' here.")
+            if len(results) > 1:
+                raise ActionFailed(multiple_choice(results))
+        if len(results) == 1 and then is not None:
+            then(results[0])
+        return results
+
+    if objects is None:
+        objects = []
     if short_names is None:
-        short_names = player_snames(player)
-    if what in short_names:
-        dofun(short_names[what])
-    elif len(found) < 1:
-        player.send(notfound.format(what))
-    elif len(found) > 1:
-        player.send(multiple_choice(found))
-    else:
-        dofun(found[0])
+        short_names = {}
+    if query in short_names:
+        return found([short_names[query]])
+    return found(match_list(query, objects))
 
 
 def multiple_choice(choices):
@@ -74,9 +75,11 @@ def multiple_choice(choices):
 
 
 def moveto(obj, container):
-    if getattr(obj, "_parent", None) is not None:
-        obj._parent.contents.remove(obj)
-    obj._parent = container
+    if not hasattr(obj, "location"):
+        raise ActionFailed(f"{obj} cannot be moved.")
+    if obj.location is not None:
+        obj.location.contents.remove(obj)
+    obj.location = container
     if container is not None:
         container.contents.append(obj)
 

@@ -155,8 +155,14 @@ class MRThing(MRObject):
     default_description = "A boring non-descript thing"
 
     def __init__(self, name):
+        self.location = None
         self.powers = []
         super().__init__(name)
+
+    def __setstate__(self, odict):
+        if "location" not in odict:
+            odict["location"] = odict.pop("_parent", None)
+        super().__setstate__(odict)
 
 
 @register
@@ -179,7 +185,7 @@ class MRRoom(MRObject):
     def __init__(self, name):
         self.contents = []
         self.exits = []
-        super(MRRoom, self).__init__(name)
+        super().__init__(name)
 
     def emit(self, msg):
         for thing in filter(util.is_player, self.contents):
@@ -199,40 +205,37 @@ class MRRoom(MRObject):
         self.emit(rest.replace("\\n", "\n").replace("\\t", "\t"))
 
     def cmd_take(self, caller, query):
+        if query is None:
+            raise ActionFailed("Take what?")
+
         def doit(obj):
             if obj is caller:
                 return caller.emit(
                     f"{caller.name} tries to fold themselves into their own pocket, but fails."
                 )
             if "big" in obj.flags:
-                return caller.emit(f"{obj.name} is too big.")
+                raise ActionFailed(f"{obj} is too big.")
+            if obj in caller.contents:
+                raise ActionFailed(f"{obj} is already in your pocket.")
+
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
-        util.find_and_do(
-            caller,
-            query,
-            doit,
-            self.contents,
-            noarg="Take what?",
-            notfound="Can't see a thing named that here",
-        )
+        caller.find(query, then=doit)
 
     def cmd_drop(self, caller, query):
+        if query is None:
+            raise ActionFailed("Drop what?")
+
         def doit(obj):
-            util.moveto(obj, caller.room)
+            if obj not in caller.contents:
+                raise ActionFailed(f"{obj} is not in your pockets.")
+            util.moveto(obj, caller.location)
             self.emit(
                 f"{caller.name} takes {obj.name} out of their pocket and leaves it."
             )
 
-        util.find_and_do(
-            caller,
-            query,
-            doit,
-            caller.contents,
-            noarg="Take what?",
-            notfound="You don't have that in your pockets.",
-        )
+        caller.find(query, then=doit)
 
 
 @register
@@ -252,10 +255,10 @@ class MRPlayer(MRObject):
 
     def __init__(self, name):
         self.client = None
-        self._parent = None
+        self.location = None
         self.powers = []
         self.contents = []
-        super(MRPlayer, self).__init__(name)
+        super().__init__(name)
 
         if not (confs := db.list_all(Config)):
             db.add(Config())
@@ -270,6 +273,8 @@ class MRPlayer(MRObject):
         return odict
 
     def __setstate__(self, odict):
+        if "location" not in odict:
+            odict["location"] = odict.pop("_parent", None)
         super().__setstate__(odict)
         self.client = None
 
@@ -287,7 +292,7 @@ class MRPlayer(MRObject):
 
     @property
     def room(self):
-        return getattr(self, "_parent", None)
+        return getattr(self, "location", None)
 
     @property
     def cmds(self):
@@ -305,8 +310,8 @@ class MRPlayer(MRObject):
             custom_cmds.extend(container.custom_cmds.values())
 
         addthingcmds(self)
-        if self.room is not None:
-            addthingcmds(self.room)
+        if self.location is not None:
+            addthingcmds(self.location)
 
         return custom_cmds + fw_cmds
 
@@ -314,28 +319,14 @@ class MRPlayer(MRObject):
         self,
         query="",
         objects=None,
-        quiet=False,
-        then=None,
+        **kwargs,
     ):
-        def found(results):
-            if not quiet:
-                if not results:
-                    raise ActionFailed(f"You see nothing like '{query}' here.")
-                if len(results) > 1:
-                    raise ActionFailed(util.multiple_choice(results))
-            if len(results) == 1 and then is not None:
-                then(results[0])
-            return results
-
         if objects is None:
             objects = self.reachable_objects()
-        short_names = {"me": self, "here": self.room}
-        if query in short_names:
-            return found([short_names[query]])
-        return found(util.match_list(query, objects))
+        short_names = {"me": self, "here": self.location}
+        return util.find(query, objects=objects, short_names=short_names, **kwargs)
 
     def move(self, object, destination):
-        caller = self  # XXX: caller is assumed to be 'self'
         if not util.is_thing(object):
             raise ActionFailed(f"Can not move {object.name}.")
         if not hasattr(destination, "contents"):
@@ -351,17 +342,14 @@ class MRPlayer(MRObject):
             self.client.send(msg)
 
     def emit(self, msg):
-        if self.room is not None:
-            self.room.emit(msg)
+        if self.location is not None:
+            self.location.emit(msg)
 
     def reachable_objects(self):
         objs = list(self.contents)
-        if self.room is not None:
-            objs += [self.room] + self.room.contents
+        if self.location is not None:
+            objs += [self.location] + self.location.contents + self.location.exits
         return objs
-
-    def find_doit(self, query, dofun):
-        self.find(query, then=dofun)
 
     def exec_env(self):
         import mushroom
@@ -389,27 +377,22 @@ class MRPlayer(MRObject):
 
     def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
-        if query is None:
-            return self.send("Go where?")
-        place = re.match(r"(?:to )?(.*)", query).group(1)
-
-        if caller.room is None:
+        if caller.location is None:
             self.send("You're nowhere. And can't go anywhere :'(")
             return
+        place = re.match(r"(?:to )?(.*)", query).group(1)
+        if place is None:
+            raise ActionFailed("Go where?")
 
         def doit(arg):
-            self.room.emit(self.name + " has gone to " + arg.name)
-            arg.emit(self.name + " arrives from " + self.room.name)
+            if not arg in self.location.exits:
+                raise ActionFailed(f"You can't go to {arg}.")
+            self.location.emit(self.name + " has gone to " + arg.name)
+            arg.emit(self.name + " arrives from " + self.location.name)
             util.moveto(self, arg)
             self.cmd_look(self, "here")
 
-        util.find_and_do(
-            caller,
-            place,
-            doit,
-            caller.room.exits,
-            notfound="Don't know this place. Is it in Canada?",
-        )
+        self.find(place, then=doit)
 
     def cmd_look(self, player, query):
         """look [object]: see descriptions of things, people or places."""
@@ -432,19 +415,11 @@ class MRPlayer(MRObject):
                 for room in arg.exits:
                     self.send(" - " + room.name)
 
-        if self.room is None:
+        if self.location is None:
             notfound = "You see nothing but you."
         else:
             notfound = "You see nothing like '{}' here."
-        util.find_and_do(
-            player,
-            query,
-            doit,
-            self.reachable_objects(),
-            short_names=util.player_snames(self, allow_no_room=True),
-            arg_default="here",
-            notfound=notfound,
-        )
+        self.find(query or "here", then=doit, notfound=notfound)
 
 
 class MRPower:
@@ -510,7 +485,7 @@ class Engineer(MRPower):
         """examine <object>: display commands and attributes of an object.
         <object> can be a # database ID."""
         if query is None:
-            return caller.send("Examine what?")
+            raise ActionFailed("Examine what?")
 
         def doit(obj):
             what = proxify(obj)
@@ -532,7 +507,7 @@ class Engineer(MRPower):
             query is None
             or (match := re.match(r"(#\d+|\w+) ([^ ]+) (.*)", query)) is None
         ):
-            return caller.send("Try help setattr")
+            raise ActionFailed("Try help setattr")
 
         target, attr, value = match.groups()
         if (match := re.match(r"#(\d+)", value)) is not None:
@@ -550,7 +525,7 @@ class Engineer(MRPower):
         """delattr <object> <attribute>: delete an attribute on an object.
         <object> can be a # database ID."""
         if query is None or (match := re.match(r"(#\d+|\w+) ([^ ]+)", query)) is None:
-            return caller.send("Try help delattr")
+            raise ActionFailed("Try help delattr")
 
         target, attr = match.groups()
 
@@ -587,7 +562,7 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         m = re.match("(.*) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
         if m is None:
-            return caller.send("Try help match")
+            raise ActionFailed("Try help match")
         target, name, regex, code = m.groups()
 
         def doit(target):
@@ -603,7 +578,7 @@ class Engineer(MRPower):
         """setflag <object> <flag>: set a flag on an object.
         <object> can be a # database ID."""
         if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
-            return caller.send("Try help setflag")
+            raise ActionFailed("Try help setflag")
 
         target, flag = match.groups()
 
@@ -620,7 +595,7 @@ class Engineer(MRPower):
         """resetflag <object> <flag>: reset a flag on an object.
         <object> can be a # database ID."""
         if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
-            return caller.send("Try help setflag")
+            raise ActionFailed("Try help setflag")
 
         target, flag = match.groups()
 
@@ -642,16 +617,16 @@ class Digger(MRPower):
     def cmd_dig(self, caller, query):
         """dig <room name>: make a new room."""
         if not query:
-            return caller.send("Dig what? Try help dig")
+            raise ActionFailed("Dig what? Try help dig")
         room = MRRoom(query)
         db.add(room)
-        if caller.room is None:
+        if caller.location is None:
             caller.send("In a flash of darkness, a new place appears around you.")
             caller.cmd_teleport(caller, query)
             return
-        room.exits.append(caller.room)
-        caller.room.exits.append(room)
-        caller.room.emit(f"{caller.name} digs a hole that leads to {room.name}")
+        room.exits.append(caller.location)
+        caller.location.exits.append(room)
+        caller.location.emit(f"{caller.name} digs a hole that leads to {room.name}")
 
 
 class SuperDigger(Digger):
@@ -664,48 +639,37 @@ class SuperDigger(Digger):
 
     def cmd_link(self, caller, query):
         """link [to] <place>: open an exit towards the place."""
-        if caller.room is None:
-            return caller.send("Bawoops, you're nowhere.")
-        if query is None:
-            return caller.send("Link what?")
+        if caller.location is None:
+            raise ActionFailed("Bawoops, you're nowhere.")
         where = re.match(r"(?:to )?(.*)", query).group(1)
+        if where is None:
+            raise ActionFailed("Link what?")
 
         def doit(arg):
-            caller.room.exits.append(arg)
-            caller.room.emit(f"{caller.name} opens a new path towards {arg.name}")
+            caller.location.exits.append(arg)
+            caller.location.emit(f"{caller.name} opens a new path towards {arg.name}")
 
-        util.find_and_do(
-            caller,
-            where,
-            doit,
-            db.list_all(MRRoom),
-            notfound="Don't know this place. Is it in Canada?",
-        )
+        util.find(where, objects=db.list_all(MRRoom), then=doit)
 
-    def cmd_unlink(self, caller, rest):
+    def cmd_unlink(self, caller, query):
         """unlink <place>: remove the exit to that place."""
-        if caller.room is None:
-            return caller.send("There's nothing here.")
+        if caller.location is None:
+            raise ActionFailed("There's nothing here.")
+        if query is None:
+            raise ActionFailed("Unlink what?")
 
         def doit(arg):
-            caller.room.exits.remove(arg)
-            caller.room.emit(f"{caller.name} removed the exit to {arg.name}")
+            caller.location.exits.remove(arg)
+            caller.location.emit(f"{caller.name} removed the exit to {arg.name}")
 
-        util.find_and_do(
-            caller,
-            rest,
-            doit,
-            caller.room.exits,
-            noarg="Unlink what?",
-            notfound="This room ain't connected to Canada.",
-        )
+        util.find(query, objects=caller.location.exits, then=doit)
 
     # it makes sense to keep this with link, since it can open an exit to anywhere anyway
     def cmd_teleport(self, caller, query):
         """teleport [to] <place>: place can be a # database ID"""
-        if query is None:
-            return caller.send("To where?")
-        place = re.match(r"(?:to )?(.*)", query).group(1)
+        place = re.match(r"(?:to )?(.*)", query or "").group(1)
+        if place is None:
+            raise ActionFailed("Teleport to where?")
 
         def doit(room):
             caller.emit(f"{caller.name} vanishes. Gone.")
@@ -716,16 +680,10 @@ class SuperDigger(Digger):
         if (m := re.match(r"#(\d+)", place)) is not None:
             room = db.get(int(m.group(1)))
             if not util.is_room(room):
-                return caller.send(f"{room} is not a room!")
+                raise ActionFailed(f"{room} is not a room!")
             return doit(room)
 
-        util.find_and_do(
-            caller,
-            place,
-            doit,
-            db.list_all(MRRoom),
-            notfound="Don't know this place. Is it in Canada?",
-        )
+        util.find(place, objects=db.list_all(MRRoom), then=doit)
 
 
 class Maker(MRPower):
@@ -736,18 +694,18 @@ class Maker(MRPower):
 
     def cmd_make(self, caller, query):
         """make <thing name>: make things. Just regular things."""
-        if caller.room is None:
-            return caller.send("There is nowehere to make things into.")
+        if caller.location is None:
+            raise ActionFailed("There is nowehere to make things into.")
         name = query
         thing = MRThing(name)
         db.add(thing)
-        util.moveto(thing, caller.room)
-        caller.room.emit(f"{caller.name} makes {name} appear out of thin air.")
+        util.moveto(thing, caller.location)
+        caller.location.emit(f"{caller.name} makes {name} appear out of thin air.")
 
     def cmd_destroy(self, caller, query):
         """destroy <thing>: destroy things. Anything, really."""
         if query is None:
-            return caller.send("Destroy what?")
+            raise ActionFailed("Destroy what?")
 
         def doit(thing):
             if util.is_room(thing):
