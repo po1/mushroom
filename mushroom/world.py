@@ -366,7 +366,7 @@ class MRPlayer(MRObject):
 
     def cmd_describe(self, caller, query):
         """describe <object> <description>: give a description to a room, player or thing."""
-        m = re.match(r"(\w+) (.*)", query)
+        m = re.match(r"(\w+) (.*)", query or "")
         if m is None:
             raise ActionFailed("Try help describe.")
         what, description = m.groups()
@@ -381,7 +381,7 @@ class MRPlayer(MRObject):
         """go [to] <place>: move to a different place."""
         if self.location is None:
             raise ActionFailed("You're nowhere. And can't go anywhere :'(")
-        m = re.match(r"(?:to )?(.*)", query)
+        m = re.match(r"(?:to )?(.*)", query or "")
         if m is None:
             raise ActionFailed("Go where?")
         place = m.group(1)
@@ -639,9 +639,9 @@ class SuperDigger(Digger):
         """link [to] <place>: open an exit towards the place."""
         if caller.location is None:
             raise ActionFailed("Bawoops, you're nowhere.")
-        where = re.match(r"(?:to )?(.*)", query).group(1)
-        if where is None:
+        if (match := re.match(r"(?:to )?(.*)", query or "")) is None:
             raise ActionFailed("Link what?")
+        where = match.group(1)
 
         def doit(arg):
             caller.location.exits.append(arg)
