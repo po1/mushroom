@@ -215,27 +215,28 @@ class MRRoom(MRObject):
                 )
             if "big" in obj.flags:
                 raise ActionFailed(f"{obj} is too big.")
-            if obj in caller.contents:
-                raise ActionFailed(f"{obj} is already in your pocket.")
 
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 
-        caller.find(query, then=doit)
+        util.find(query, objects=caller.location.contents, then=doit)
 
     def cmd_drop(self, caller, query):
         if query is None:
             raise ActionFailed("Drop what?")
 
         def doit(obj):
-            if obj not in caller.contents:
-                raise ActionFailed(f"{obj} is not in your pockets.")
             util.moveto(obj, caller.location)
             self.emit(
                 f"{caller.name} takes {obj.name} out of their pocket and leaves it."
             )
 
-        caller.find(query, then=doit)
+        util.find(
+            query,
+            objects=caller.contents,
+            notfound=f"There's nothing like '{query}' in your pockets.",
+            then=doit,
+        )
 
 
 @register
@@ -306,12 +307,12 @@ class MRPlayer(MRObject):
                 if util.is_thing(thing):
                     fw_cmds.extend(thing._fwcmds)
                     custom_cmds.extend(thing.custom_cmds.values())
-            fw_cmds.extend(container._fwcmds)
-            custom_cmds.extend(container.custom_cmds.values())
 
         addthingcmds(self)
         if self.location is not None:
             addthingcmds(self.location)
+            fw_cmds.extend(self.location._fwcmds)
+            custom_cmds.extend(self.location.custom_cmds.values())
 
         return custom_cmds + fw_cmds
 
@@ -363,36 +364,40 @@ class MRPlayer(MRObject):
             "re": re,
         }
 
-    def cmd_describe(self, player, query):
+    def cmd_describe(self, caller, query):
         """describe <object> <description>: give a description to a room, player or thing."""
-        if query is None:
-            return self.send("Describe what?")
-        what, description = re.match(r"(\w+) (.*)", query).groups()
+        m = re.match(r"(\w+) (.*)", query)
+        if m is None:
+            raise ActionFailed("Try help describe.")
+        what, description = m.groups()
 
         def doit(thing):
             thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
-            self.send("Added description of {}".format(thing.name))
+            caller.send("Added description of {}".format(thing.name))
 
         self.find(what, then=doit)
 
     def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
-        if caller.location is None:
-            self.send("You're nowhere. And can't go anywhere :'(")
-            return
-        place = re.match(r"(?:to )?(.*)", query).group(1)
-        if place is None:
+        if self.location is None:
+            raise ActionFailed("You're nowhere. And can't go anywhere :'(")
+        m = re.match(r"(?:to )?(.*)", query)
+        if m is None:
             raise ActionFailed("Go where?")
+        place = m.group(1)
 
         def doit(arg):
-            if not arg in self.location.exits:
-                raise ActionFailed(f"You can't go to {arg}.")
             self.location.emit(self.name + " has gone to " + arg.name)
             arg.emit(self.name + " arrives from " + self.location.name)
             util.moveto(self, arg)
             self.cmd_look(self, "here")
 
-        self.find(place, then=doit)
+        util.find(
+            place,
+            objects=self.location.exits,
+            notfound=f"There doesn't seem to be a place named '{place}' nearby.",
+            then=doit,
+        )
 
     def cmd_look(self, player, query):
         """look [object]: see descriptions of things, people or places."""
@@ -503,10 +508,7 @@ class Engineer(MRPower):
         """setattr <object> <attribute> <value>: set an attribute on an object.
         <object> can be a # database ID.
         <value> can be a # database ID, otherwise it is a string."""
-        if (
-            query is None
-            or (match := re.match(r"(#\d+|\w+) ([^ ]+) (.*)", query)) is None
-        ):
+        if (match := re.match(r"(#\d+|\w+) ([^ ]+) (.*)", query or "")) is None:
             raise ActionFailed("Try help setattr")
 
         target, attr, value = match.groups()
@@ -524,7 +526,7 @@ class Engineer(MRPower):
     def cmd_delattr(self, caller, query):
         """delattr <object> <attribute>: delete an attribute on an object.
         <object> can be a # database ID."""
-        if query is None or (match := re.match(r"(#\d+|\w+) ([^ ]+)", query)) is None:
+        if (match := re.match(r"(#\d+|\w+) ([^ ]+)", query or "")) is None:
             raise ActionFailed("Try help delattr")
 
         target, attr = match.groups()
@@ -539,12 +541,8 @@ class Engineer(MRPower):
 
     def cmd_cmd(self, caller, query):
         """cmd <object> <cmd> <code>: add a command to an object."""
-        if (
-            query is None
-            or (match := re.match(r"((?:\w+)|(?:#\d+)) ([^ ]+) (.*)", query)) is None
-        ):
-            caller.send("Try 'help cmd'. Haha.")
-            return
+        if (match := re.match(r"((?:\w+)|(?:#\d+)) ([^ ]+) (.*)", query or "")) is None:
+            raise ActionFailed("Try 'help cmd'.")
         target, cmd, txt = match.groups()
         txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
 
@@ -553,9 +551,9 @@ class Engineer(MRPower):
             caller.send(f"Added command {cmd} to {thing.name}")
 
         if (m := re.match("#(\d+)", target)) is not None:
-            doit(db.get(int(m.group(1))))
-        else:
-            caller.find(target, then=doit)
+            return doit(db.get(int(m.group(1))))
+
+        caller.find(target, then=doit)
 
     def cmd_match(self, caller, query):
         """match <object> [<name>:]<match regexp> <code>: add a matcher to an object.
@@ -577,7 +575,7 @@ class Engineer(MRPower):
     def cmd_setflag(self, caller, query):
         """setflag <object> <flag>: set a flag on an object.
         <object> can be a # database ID."""
-        if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
+        if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
             raise ActionFailed("Try help setflag")
 
         target, flag = match.groups()
@@ -594,8 +592,8 @@ class Engineer(MRPower):
     def cmd_resetflag(self, caller, query):
         """resetflag <object> <flag>: reset a flag on an object.
         <object> can be a # database ID."""
-        if query is None or (match := re.match(r"(#\d+|\w+) (.*)", query)) is None:
-            raise ActionFailed("Try help setflag")
+        if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
+            raise ActionFailed("Try help resetflag")
 
         target, flag = match.groups()
 
@@ -710,9 +708,10 @@ class Maker(MRPower):
         def doit(thing):
             if util.is_room(thing):
                 thing.emit(f"{caller.name} blew up the place!")
-                for p in filter(util.is_player, thing.contents):
-                    p.send("You fall into the void of nothingness.")
-                    util.moveto(p, None)
+                for o in thing.contents:
+                    if util.is_player(o):
+                        o.send("You fall into the void of nothingness.")
+                    util.moveto(o, None)
             else:
                 caller.emit(caller.name + " violently destroyed " + thing.name + "!")
                 util.moveto(thing, None)
@@ -721,7 +720,7 @@ class Maker(MRPower):
                 if thing.client is not None:
                     thing.client.player = None
                     thing.send(
-                        "Your character has been slain. You were kicked out of it"
+                        "Your character has been slain. You were kicked out of it."
                     )
 
         caller.find(query, then=doit)
