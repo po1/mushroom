@@ -86,18 +86,18 @@ class Database:
 db = Database()
 
 
+def _prox(f):
+    def __fun(self, *args, **kwargs):
+        return proxify(f.__get__(self.db)(*args, **kwargs))
+
+    return __fun
+
+
 class DbProxy:
     """A version of the database that's somewhat safer to use for in-game scripting."""
 
     def __init__(self, db) -> None:
         self.db = db
-
-    @staticmethod
-    def _prox(f):
-        def __fun(self, *args, **kwargs):
-            return proxify(f.__get__(self.db)(*args, **kwargs))
-
-        return __fun
 
     def __repr__(self):
         return "<Database db>"

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 class Config:
     """Instances of this class serve as global config."""
 
-    listen_address: str = "localhost"
+    listen_address: str = ""  # empty means to listen on all addresses
     listen_port: int = 1337
 
     motd_file: str = "MOTD"

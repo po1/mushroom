@@ -294,6 +294,7 @@ def main():
     except IOError:
         print("Database not found")
 
+    print(f"Starting server on {cfg.listen_address}:{cfg.listen_port}")
     server = Server(cfg, db)
     server.serve_forever()
 

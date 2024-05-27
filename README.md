@@ -8,6 +8,16 @@ A MUSH is a text-mode game, the server will be reachable by telnet, netcat,
 and other very simple TCP/IP text clients. The default port is 1337.
 You can change it in a `config.toml` file.
 
+NEW! All-in-one:
+---------------
+
+```
+docker compose up -d
+```
+
+Then point your browser to http://localhost:8000
+
+
 Launching the server:
 --------------------
 
