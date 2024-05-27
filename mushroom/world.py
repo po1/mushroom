@@ -620,7 +620,7 @@ class Digger(MRPower):
         db.add(room)
         if caller.location is None:
             caller.send("In a flash of darkness, a new place appears around you.")
-            caller.cmd_teleport(caller, query)
+            util.moveto(caller, room)
             return
         room.exits.append(caller.location)
         caller.location.exits.append(room)
