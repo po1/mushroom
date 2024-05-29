@@ -290,7 +290,7 @@ def parse_args():
 
 
 def main():
-    logging.basicConfig()
+    logging.basicConfig(level=logging.INFO)
 
     from .db import db as global_db
 
@@ -304,11 +304,11 @@ def main():
     cfg = Config(**cfg_override)
     try:
         db.load(cfg.db_file)
-        print("Database successfully loaded")
+        logging.info("Database successfully loaded.")
     except IOError:
-        print("Database not found")
+        logging.info("Database not found, starting fresh.")
 
-    print(f"Starting server on {cfg.listen_address}:{cfg.listen_port}")
+    logging.info(f"Starting server on {cfg.listen_address}:{cfg.listen_port}")
     server = Server(cfg, db)
     server.serve_forever()
 
