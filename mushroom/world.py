@@ -423,7 +423,7 @@ class MRPlayer(MRObject):
         if self.location is None:
             notfound = "You see nothing but you."
         else:
-            notfound = "You see nothing like '{}' here."
+            notfound = f"You see nothing like '{query}' here."
         self.find(query or "here", then=doit, notfound=notfound)
 
 
