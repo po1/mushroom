@@ -256,8 +256,7 @@ class Server:
         self.server_thread.start()
         self.autosave_thread.start()
 
-        logging.info("Server started and ready to accept connections")
-        logging.info("Loading database...")
+        logging.info("Server started and ready to accept connections.")
 
     def save_db(self):
         self.db.dump(self.config.db_file)
