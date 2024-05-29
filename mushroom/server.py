@@ -193,7 +193,7 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return True
 
     def scmd_save(self, rest):
-        self.server.db.dump(self.server.cfg.db_file)
+        self.server.save_db()
         self.handler_write("Database saved\n")
         return True
 
@@ -251,10 +251,23 @@ class Server:
         self.server.log = LogFile(self.config.log_file)
         self.server.db = self.db
         self.server.cfg = self.config
+        self.autosave_thread = threading.Thread(target=self.autosave, daemon=True)
+
         self.server_thread.start()
+        self.autosave_thread.start()
 
         logging.info("Server started and ready to accept connections")
         logging.info("Loading database...")
+
+    def save_db(self):
+        self.db.dump(self.config.db_file)
+
+    def autosave(self):
+        while True:
+            time.sleep(self.config.autosave_period)
+            self.save_db()
+            if self.server_thread.is_alive():
+                self.server.cr.broadcast("Saving the world...")
 
     def serve_forever(self):
         # Wait for a user shutdown
@@ -266,6 +279,7 @@ class Server:
         self.server.cr.broadcast("Shutting down...")
         self.server.cr.shutdown()
         self.server.shutdown()
+        self.save_db()
 
 
 def parse_args():

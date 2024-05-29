@@ -18,3 +18,5 @@ class Config:
     debug: bool = True
 
     log_file: str = "server.log"
+
+    autosave_period: int = 300
