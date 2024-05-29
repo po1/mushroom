@@ -111,6 +111,8 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         for data in self.rfile:
             try:
                 data = data.decode("utf8")
+                with self.server.dirty_lock:
+                    self.server.dirty = True
                 if self.server.cfg.debug:
                     self.server.log(f"data from {self.cl.name}: {repr(data)}")
                 if not self.handle_scommands(data):
@@ -245,25 +247,34 @@ class Server:
         # more thread for each request
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         # Exit the server thread when the main thread terminates
-        self.server_thread.Daemon = True
+        self.server_thread.daemon = True
         self.server.running = True
         self.server.cr = ClientRegister()
         self.server.log = LogFile(self.config.log_file)
         self.server.db = self.db
         self.server.cfg = self.config
-        self.autosave_thread = threading.Thread(target=self.autosave, daemon=True)
+        self.server.dirty = False
+        self.server.dirty_lock = threading.Lock()
+        self.server.save_db = self.save_db
 
+        self.autosave_thread = threading.Thread(target=self.autosave, daemon=True)
         self.server_thread.start()
         self.autosave_thread.start()
 
         logging.info("Server started and ready to accept connections.")
 
     def save_db(self):
+        logging.info("Saving database.")
         self.db.dump(self.config.db_file)
 
     def autosave(self):
         while True:
             time.sleep(self.config.autosave_period)
+            with self.server.dirty_lock:
+                dirty = self.server.dirty
+                self.server.dirty = False
+            if not dirty:
+                continue
             self.save_db()
             if self.server_thread.is_alive():
                 self.server.cr.broadcast("Saving the world...")
