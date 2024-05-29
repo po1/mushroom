@@ -13,3 +13,5 @@
 # debug = True
 
 # log_file = "server.log"
+
+# autosave_period = 300
