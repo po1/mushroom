@@ -188,6 +188,7 @@ class MRRoom(MRObject):
         super().__init__(name)
 
     def emit(self, msg):
+        """emit <stuff>: display text to all connected players in the room."""
         for thing in filter(util.is_player, self.contents):
             thing.send(msg)
 
@@ -205,6 +206,7 @@ class MRRoom(MRObject):
         self.emit(rest.replace("\\n", "\n").replace("\\t", "\t"))
 
     def cmd_take(self, caller, query):
+        """take <thing>: move a thing into your pocket."""
         if query is None:
             raise ActionFailed("Take what?")
 
@@ -222,6 +224,7 @@ class MRRoom(MRObject):
         util.find(query, objects=caller.location.contents, then=doit)
 
     def cmd_drop(self, caller, query):
+        """drop <thing>: move a thing out of your pocket."""
         if query is None:
             raise ActionFailed("Drop what?")
 
