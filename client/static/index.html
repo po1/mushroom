@@ -44,6 +44,11 @@
             white-space: pre-wrap;
         }
 
+        .echo {
+            font-size: 80%;
+            color: rgb(133, 199, 170);
+        }
+
         .online-status {
             font-weight: bold;
             color: greenyellow;
@@ -117,7 +122,7 @@
                     }
                     const sh = $('.console-text').get(0).scrollHeight;
                     const line = $('.input').val()
-                    $('.console-text').append('<br /> &gt; ' + line + '<br />').scrollTop(sh);
+                    $('.console-text').append('<br /> <span class="echo">&gt; ' + line + '</span><br />').scrollTop(sh);
                     $('.input').val('');
 
                     history.push(line);
