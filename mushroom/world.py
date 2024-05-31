@@ -636,11 +636,37 @@ class Digger(MRPower):
         caller.location.emit(f"{caller.name} digs a hole that leads to {room.name}")
 
 
-class SuperDigger(Digger):
+class Demolisher(MRPower):
+    fw_cmds = {
+        "demolish": "cmd_demolish",
+    }
+
+    def cmd_demolish(self, caller, query):
+        """demolish <room>: demolish a room."""
+        if query is None:
+            raise ActionFailed("Demolish what?")
+
+        def doit(room):
+            room.emit(f"{caller.name} blew up the place!")
+            caller.location.emit(f"{caller.name} demolished {room.name}!")
+            caller.location.exits.remove(room)
+            for o in room.contents:
+                if util.is_player(o):
+                    o.send(f"The explosion blows you towards {caller.location.name}")
+                util.moveto(o, caller.location)
+            db.remove(room)
+
+        if caller.location is None or not hasattr(caller.location, "exits"):
+            raise ActionFailed("There are no rooms to demolish around here.")
+        util.find(query, objects=caller.location.exits, then=doit)
+
+
+class SuperDigger(Demolisher, Digger):
     fw_cmds = {
         "link": "cmd_link",
         "unlink": "cmd_unlink",
         "teleport": "cmd_teleport",
+        **Demolisher.fw_cmds,
         **Digger.fw_cmds,
     }
 
@@ -710,27 +736,16 @@ class Maker(MRPower):
         caller.location.emit(f"{caller.name} makes {name} appear out of thin air.")
 
     def cmd_destroy(self, caller, query):
-        """destroy <thing>: destroy things. Anything, really."""
+        """destroy <thing>: destroy things."""
         if query is None:
             raise ActionFailed("Destroy what?")
 
         def doit(thing):
-            if util.is_room(thing):
-                thing.emit(f"{caller.name} blew up the place!")
-                for o in thing.contents:
-                    if util.is_player(o):
-                        o.send("You fall into the void of nothingness.")
-                    util.moveto(o, None)
-            else:
-                caller.emit(caller.name + " violently destroyed " + thing.name + "!")
-                util.moveto(thing, None)
+            if not util.is_thing(thing):
+                raise ActionFailed("You can't destroy that.")
+            caller.emit(caller.name + " violently destroyed " + thing.name + "!")
+            util.moveto(thing, None)
             db.remove(thing)
-            if util.is_player(thing):
-                if thing.client is not None:
-                    thing.client.player = None
-                    thing.send(
-                        "Your character has been slain. You were kicked out of it."
-                    )
 
         caller.find(query, then=doit)
 
