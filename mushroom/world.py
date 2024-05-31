@@ -203,6 +203,8 @@ class MRRoom(MRObject):
 
     def cmd_emit(self, player, rest):
         """emit <stuff>: broadcast text in the current room."""
+        if not rest:
+            raise ActionFailed("Emit what?")
         self.emit(rest.replace("\\n", "\n").replace("\\t", "\t"))
 
     def cmd_take(self, caller, query):
@@ -217,6 +219,8 @@ class MRRoom(MRObject):
                 )
             if "big" in obj.flags:
                 raise ActionFailed(f"{obj} is too big.")
+            if not util.is_thing(obj) and not "big" in caller.flags:
+                raise ActionFailed(f"{obj} won't fit in your pocket.")
 
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
@@ -375,6 +379,8 @@ class MRPlayer(MRObject):
         what, description = m.groups()
 
         def doit(thing):
+            if thing is None:
+                raise ActionFailed("There is nothing to describe.")
             thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
             caller.send("Added description of {}".format(thing.name))
 
