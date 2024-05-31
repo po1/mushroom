@@ -4,3 +4,5 @@ world.sav
 node_modules/
 __pycache__/
 *.egg-info/
+server.log
+venv/
