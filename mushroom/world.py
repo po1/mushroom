@@ -471,6 +471,7 @@ class Engineer(MRPower):
         "match": "cmd_match",
         "setflag": "cmd_setflag",
         "resetflag": "cmd_resetflag",
+        "delcmd": "cmd_delcmd",
     }
 
     def _exec_env(self, caller):
@@ -510,7 +511,6 @@ class Engineer(MRPower):
 
         if (m := re.match(r"#(\d+)", query)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(query, then=doit)
 
     def cmd_setattr(self, caller, query):
@@ -518,7 +518,7 @@ class Engineer(MRPower):
         <object> can be a # database ID.
         <value> can be a # database ID, otherwise it is a string."""
         if (match := re.match(r"(#\d+|\w+) ([^ ]+) (.*)", query or "")) is None:
-            raise ActionFailed("Try help setattr")
+            raise ActionFailed("Try 'help setattr'.")
 
         target, attr, value = match.groups()
         if (match := re.match(r"#(\d+)", value)) is not None:
@@ -529,14 +529,13 @@ class Engineer(MRPower):
 
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(target, then=doit)
 
     def cmd_delattr(self, caller, query):
         """delattr <object> <attribute>: delete an attribute on an object.
         <object> can be a # database ID."""
         if (match := re.match(r"(#\d+|\w+) ([^ ]+)", query or "")) is None:
-            raise ActionFailed("Try help delattr")
+            raise ActionFailed("Try 'help delattr'.")
 
         target, attr = match.groups()
 
@@ -545,7 +544,6 @@ class Engineer(MRPower):
 
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(target, then=doit)
 
     def cmd_cmd(self, caller, query):
@@ -561,7 +559,6 @@ class Engineer(MRPower):
 
         if (m := re.match("#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(target, then=doit)
 
     def cmd_match(self, caller, query):
@@ -569,7 +566,7 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         m = re.match("(.*) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
         if m is None:
-            raise ActionFailed("Try help match")
+            raise ActionFailed("Try 'help match'.")
         target, name, regex, code = m.groups()
 
         def doit(target):
@@ -581,11 +578,29 @@ class Engineer(MRPower):
             return doit(db.get(int(m.group(1))))
         return caller.find(target, then=doit)
 
+    def cmd_delcmd(self, caller, query):
+        """delcmd <object> <cmd>: delete a command or match.
+        <object> can be a # database ID."""
+        if (match := re.match(r"(#\d+|\w+) ([^ ]+)", query or "")) is None:
+            raise ActionFailed("Try 'help delcmd'.")
+
+        target, cmd = match.groups()
+
+        def doit(obj):
+            if cmd not in getattr(obj, "custom_cmds", {}):
+                raise ActionFailed(f"{obj} does not have command {cmd}")
+            del obj.custom_cmds[cmd]
+            caller.send(f"Deleted command {cmd} from {obj}")
+
+        if (m := re.match(r"#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+        caller.find(target, then=doit)
+
     def cmd_setflag(self, caller, query):
         """setflag <object> <flag>: set a flag on an object.
         <object> can be a # database ID."""
         if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
-            raise ActionFailed("Try help setflag")
+            raise ActionFailed("Try 'help setflag'.")
 
         target, flag = match.groups()
 
@@ -595,14 +610,13 @@ class Engineer(MRPower):
 
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(target, then=doit)
 
     def cmd_resetflag(self, caller, query):
         """resetflag <object> <flag>: reset a flag on an object.
         <object> can be a # database ID."""
         if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
-            raise ActionFailed("Try help resetflag")
+            raise ActionFailed("Try 'help resetflag'.")
 
         target, flag = match.groups()
 
@@ -612,7 +626,6 @@ class Engineer(MRPower):
 
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
-
         caller.find(target, then=doit)
 
 
