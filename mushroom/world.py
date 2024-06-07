@@ -507,6 +507,8 @@ class Engineer(MRPower):
         "setflag": "cmd_setflag",
         "resetflag": "cmd_resetflag",
         "delcmd": "cmd_delcmd",
+        "setevent": "cmd_setevent",
+        "delevent": "cmd_delevent",
     }
 
     def _exec_env(self, caller):
@@ -658,6 +660,40 @@ class Engineer(MRPower):
         def doit(obj):
             if flag in obj.flags:
                 obj.flags.remove(flag)
+
+        if (m := re.match(r"#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+        caller.find(target, then=doit)
+
+    def cmd_setevent(self, caller, query):
+        """setevent <object> <event> <code>: set an event handler on an object.
+        <object> can be a # database ID."""
+        if (match := re.match(r"(#\d+|\w+) (\w+) (.*)", query or "")) is None:
+            raise ActionFailed("Try 'help setevent'.")
+
+        target, event, code = match.groups()
+
+        def doit(obj):
+            obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
+            caller.send(f"Set event handler {event} on {obj}")
+
+        if (m := re.match(r"#(\d+)", target)) is not None:
+            return doit(db.get(int(m.group(1))))
+        caller.find(target, then=doit)
+
+    def cmd_delevent(self, caller, query):
+        """delevent <object> <event>: delete an event handler on an object.
+        <object> can be a # database ID."""
+        if (match := re.match(r"(#\d+|\w+) (\w+)", query or "")) is None:
+            raise ActionFailed("Try 'help delcmd'.")
+
+        target, event = match.groups()
+
+        def doit(obj):
+            if event not in getattr(obj, "custom_event_handlers", {}):
+                raise ActionFailed(f"{obj} does not have event handler {event}")
+            del obj.custom_event_handlers[event]
+            caller.send(f"Deleted event handler {event} from {obj}")
 
         if (m := re.match(r"#(\d+)", target)) is not None:
             return doit(db.get(int(m.group(1))))
