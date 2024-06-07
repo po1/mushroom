@@ -8,7 +8,7 @@ import threading
 import time
 
 from . import util
-from .commands import CustomCommand, RegexpAction, WrapperCommand, ActionFailed
+from .commands import CustomCommand, RegexpAction, WrapperCommand, ActionFailed, EventHandler
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
@@ -83,17 +83,28 @@ class MRObject(BaseObject):
 
     fancy_name = "object"
     fw_cmds = {}
+    fw_event_handlers = {}
     default_description = "An abstract object."
 
     def __init__(self, name):
         super().__init__(name)
         self.description = self.default_description
         self.custom_cmds = {}
+        self.custom_event_handlers = {}
         self._initcmds()
         self.flags = []
 
     def has_flag(self, flag):
         return flag in self.flags
+
+    def dispatch(self, event, *args):
+        if event in self.custom_event_handlers:
+            skip_next = self.custom_event_handlers[event].run(*args)
+            if skip_next:
+                return
+        if event in self.fw_event_handlers:
+            handler = getattr(self, self.fw_event_handlers[event])
+            handler(*args)
 
     def _initcmds(self):
         self._fwcmds = [
@@ -144,8 +155,31 @@ class Config(MRObject):
         self.default_room = None
 
 
+class MRStuff(MRObject):
+    """
+    Stuff that can be in rooms. Things or players.
+    """
+
+    def __init__(self, name):
+        self.location = None
+        self.contents = []
+        super().__init__(name)
+
+    def emit(self, msg):
+        if self.location is not None:
+            self.location.emit(msg)
+
+    def oemit(self, msg):
+        if self.location is None:
+            return
+        for obj in self.location.contents:
+            if obj != self:
+                obj.dispatch('emit', msg)
+
+
+
 @register
-class MRThing(MRObject):
+class MRThing(MRStuff):
     """
     Things that are not players or rooms.
     Usually common objects, usable or not.
@@ -155,7 +189,6 @@ class MRThing(MRObject):
     default_description = "A boring non-descript thing"
 
     def __init__(self, name):
-        self.location = None
         self.powers = []
         super().__init__(name)
 
@@ -163,6 +196,13 @@ class MRThing(MRObject):
         if "location" not in odict:
             odict["location"] = odict.pop("_parent", None)
         super().__setstate__(odict)
+
+    # need this as a /dev/null sink for event handlers
+    def send(self, msg):
+        pass
+
+    def exec_env(self):
+        return {}
 
 
 @register
@@ -189,19 +229,14 @@ class MRRoom(MRObject):
 
     def emit(self, msg):
         """emit <stuff>: display text to all connected players in the room."""
-        for thing in filter(util.is_player, self.contents):
-            thing.send(msg)
+        for thing in self.contents:
+            thing.dispatch('emit', msg)
 
-    def oemit(self, player, msg):
-        for pl in filter(util.is_player, self.contents):
-            if pl != player:
-                pl.send(msg)
-
-    def cmd_say(self, player, rest):
+    def cmd_say(self, caller, rest):
         """say <stuff>: say something out loud where you are."""
-        self.emit(player.name + " says: " + rest)
+        self.emit(caller.name + " says: " + rest)
 
-    def cmd_emit(self, player, rest):
+    def cmd_emit(self, caller, rest):
         """emit <stuff>: broadcast text in the current room."""
         if not rest:
             raise ActionFailed("Emit what?")
@@ -247,7 +282,7 @@ class MRRoom(MRObject):
 
 
 @register
-class MRPlayer(MRObject):
+class MRPlayer(MRStuff):
     """
     Basic Player.
     Other player classes derive from this
@@ -259,13 +294,14 @@ class MRPlayer(MRObject):
         "go": "cmd_go",
         "describe": "cmd_describe",
     }
+    fw_event_handlers = {
+        "emit": "on_emit",
+    }
     default_description = "A non-descript citizen."
 
     def __init__(self, name):
         self.client = None
-        self.location = None
         self.powers = []
-        self.contents = []
         super().__init__(name)
 
         if not (confs := db.list_all(Config)):
@@ -349,10 +385,6 @@ class MRPlayer(MRObject):
         if self.client is not None:
             self.client.send(msg)
 
-    def emit(self, msg):
-        if self.location is not None:
-            self.location.emit(msg)
-
     def reachable_objects(self):
         objs = list(self.contents)
         if self.location is not None:
@@ -384,11 +416,11 @@ class MRPlayer(MRObject):
             thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
             caller.send("Added description of {}".format(thing.name))
 
-        self.find(what, then=doit)
+        caller.find(what, then=doit)
 
     def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
-        if self.location is None:
+        if caller.location is None:
             raise ActionFailed("You're nowhere. And can't go anywhere :'(")
         m = re.match(r"(?:to )?(.*)", query or "")
         if m is None:
@@ -396,44 +428,47 @@ class MRPlayer(MRObject):
         place = m.group(1)
 
         def doit(arg):
-            self.location.emit(self.name + " has gone to " + arg.name)
-            arg.emit(self.name + " arrives from " + self.location.name)
+            caller.location.emit(caller.name + " has gone to " + arg.name)
+            arg.emit(caller.name + " arrives from " + caller.location.name)
             util.moveto(self, arg)
-            self.cmd_look(self, "here")
+            caller.cmd_look(self, "here")
 
         util.find(
             place,
-            objects=self.location.exits,
+            objects=caller.location.exits,
             notfound=f"There doesn't seem to be a place named '{place}' nearby.",
             then=doit,
         )
 
-    def cmd_look(self, player, query):
+    def cmd_look(self, caller, query):
         """look [object]: see descriptions of things, people or places."""
 
         def doit(arg):
             if arg is None:
-                self.send("You only see nothing. A lot of nothing.")
+                caller.send("You only see nothing. A lot of nothing.")
                 return
-            self.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
+            caller.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
             if hasattr(arg, "contents") and not arg.has_flag("opaque"):
-                self.send("")  # extra newline
+                caller.send("")  # extra newline
                 if arg.contents:
-                    self.send("Contents:")
+                    caller.send("Contents:")
                 for thing in arg.contents:
-                    self.send(" - " + thing.name)
+                    caller.send(" - " + thing.name)
             if hasattr(arg, "exits") and not arg.has_flag("opaque"):
-                self.send("")  # extra newline
+                caller.send("")  # extra newline
                 if arg.exits:
-                    self.send("Nearby places:")
+                    caller.send("Nearby places:")
                 for room in arg.exits:
-                    self.send(" - " + room.name)
+                    caller.send(" - " + room.name)
 
-        if self.location is None:
+        if caller.location is None:
             notfound = "You see nothing but you."
         else:
             notfound = f"You see nothing like '{query}' here."
-        self.find(query or "here", then=doit, notfound=notfound)
+        caller.find(query or "here", then=doit, notfound=notfound)
+
+    def on_emit(self, msg):
+        self.send(msg)
 
 
 class MRPower:
@@ -661,11 +696,10 @@ class Demolisher(MRPower):
 
         def doit(room):
             room.emit(f"{caller.name} blew up the place!")
+            room.emit(f"The explosion blows you towards {caller.location.name}")
             caller.location.emit(f"{caller.name} demolished {room.name}!")
             caller.location.exits.remove(room)
             for o in room.contents:
-                if util.is_player(o):
-                    o.send(f"The explosion blows you towards {caller.location.name}")
                 util.moveto(o, caller.location)
             db.remove(room)
 

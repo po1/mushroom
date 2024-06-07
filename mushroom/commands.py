@@ -14,7 +14,7 @@ def run_code(caller, code, owner=None, **kwargs):
         "send": caller.send,
         "self": proxify(owner),
         "caller": proxify(caller),
-        "here": proxify(caller.room),
+        "here": proxify(caller.location),
         **caller.exec_env(),
         **kwargs,
     }
@@ -144,3 +144,16 @@ def add_answer_to(answer, target):
     """Add and register cleanup."""
     answer.cleanup = lambda: target.remove_cmd(answer)
     target.add_cmd(answer)
+
+
+class EventHandler:
+    def __init__(self, code, owner):
+        self.code = code
+        self.owner = owner
+
+    def __repr__(self):
+        txt = self.code.replace("\\", "\\\\").replace("\n", "\\n")
+        return f"<event handler: {txt}>"
+
+    def run(self, *args):
+        run_code(self.owner, self.code, owner=self.owner)
