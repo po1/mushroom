@@ -97,14 +97,14 @@ class MRObject(BaseObject):
     def has_flag(self, flag):
         return flag in self.flags
 
-    def dispatch(self, event, *args):
+    def dispatch(self, event, **kwargs):
         if event in self.custom_event_handlers:
-            skip_next = self.custom_event_handlers[event].run(*args)
+            skip_next = self.custom_event_handlers[event].run(**kwargs)
             if skip_next:
                 return
         if event in self.fw_event_handlers:
             handler = getattr(self, self.fw_event_handlers[event])
-            handler(*args)
+            handler(**kwargs)
 
     def _initcmds(self):
         self._fwcmds = [
@@ -174,7 +174,7 @@ class MRStuff(MRObject):
             return
         for obj in self.location.contents:
             if obj != self:
-                obj.dispatch('emit', msg)
+                obj.dispatch('emit', text=msg)
 
 
 
@@ -230,7 +230,7 @@ class MRRoom(MRObject):
     def emit(self, msg):
         """emit <stuff>: display text to all connected players in the room."""
         for thing in self.contents:
-            thing.dispatch('emit', msg)
+            thing.dispatch('emit', text=msg)
 
     def cmd_say(self, caller, rest):
         """say <stuff>: say something out loud where you are."""
@@ -467,8 +467,8 @@ class MRPlayer(MRStuff):
             notfound = f"You see nothing like '{query}' here."
         caller.find(query or "here", then=doit, notfound=notfound)
 
-    def on_emit(self, msg):
-        self.send(msg)
+    def on_emit(self, text):
+        self.send(text)
 
 
 class MRPower:

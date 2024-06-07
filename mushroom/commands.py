@@ -155,5 +155,5 @@ class EventHandler:
         txt = self.code.replace("\\", "\\\\").replace("\n", "\\n")
         return f"<event handler: {txt}>"
 
-    def run(self, *args):
-        run_code(self.owner, self.code, owner=self.owner)
+    def run(self, **kwargs):
+        run_code(self.owner, self.code, owner=self.owner, **kwargs)
