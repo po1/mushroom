@@ -37,8 +37,8 @@ def match_list(short, elts):
 
 def player_snames(player, allow_no_room=False):
     sn = {"me": player}
-    if player.room is not None or allow_no_room:
-        sn["here"] = player.room
+    if player.location is not None or allow_no_room:
+        sn["here"] = player.location
     return sn
 
 

@@ -335,10 +335,6 @@ class MRPlayer(MRStuff):
         return pows
 
     @property
-    def room(self):
-        return getattr(self, "location", None)
-
-    @property
     def cmds(self):
         fw_cmds = list(self._fwcmds)
         custom_cmds = list(self.custom_cmds.values())
