@@ -1,5 +1,6 @@
 import os
 import pickle
+import re
 
 from . import util
 from .object import BaseObject, proxify
@@ -80,6 +81,11 @@ class Database:
     def list_all(self, type=BaseObject):
         with self.lock.r:
             return self.search("", type)
+
+    def dbref(self, query):
+        if (m := re.match(r'#(\d+)', query)) is None:
+            return None
+        return self.get(int(m.group(1)))
 
 
 # global instance

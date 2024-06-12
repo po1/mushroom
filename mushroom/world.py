@@ -12,6 +12,7 @@ from .commands import CustomCommand, RegexpAction, WrapperCommand, ActionFailed,
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
+from .util import regexp_command
 
 
 class Game:
@@ -399,20 +400,13 @@ class MRPlayer(MRStuff):
             "re": re,
         }
 
-    def cmd_describe(self, caller, query):
+    @regexp_command("describe", r"(#\d+|\w+) (.*)")
+    def cmd_describe(self, caller, thing, description):
         """describe <object> <description>: give a description to a room, player or thing."""
-        m = re.match(r"(\w+) (.*)", query or "")
-        if m is None:
-            raise ActionFailed("Try help describe.")
-        what, description = m.groups()
-
-        def doit(thing):
-            if thing is None:
-                raise ActionFailed("There is nothing to describe.")
-            thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
-            caller.send("Added description of {}".format(thing.name))
-
-        caller.find(what, then=doit)
+        if thing is None:
+            raise ActionFailed("There is nothing to describe.")
+        thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
+        caller.send("Added description of {}".format(thing.name))
 
     def cmd_go(self, caller, query):
         """go [to] <place>: move to a different place."""
@@ -437,7 +431,9 @@ class MRPlayer(MRStuff):
         )
 
     def cmd_look(self, caller, query):
-        """look [object]: see descriptions of things, people or places."""
+        """look [at] [object]: see descriptions of things, people or places."""
+        if (m := re.match(r"(?:at )?(.*)", query or "")) is not None:
+            query = m.group(1)
 
         def doit(arg):
             if arg is None:
@@ -529,171 +525,83 @@ class Engineer(MRPower):
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
 
-    def cmd_examine(self, caller, query):
+    @regexp_command("examine", r"(#\d+|\w+)")
+    def cmd_examine(self, caller, obj):
         """examine <object>: display commands and attributes of an object.
         <object> can be a # database ID."""
-        if query is None:
-            raise ActionFailed("Examine what?")
+        caller.send(f"{repr(obj)}:")
+        caller.send(
+            "\n".join(f"  {k}: {repr(getattr(obj, k))}" for k in dir(obj))
+        )
 
-        def doit(obj):
-            what = proxify(obj)
-            caller.send(f"{repr(what)}:")
-            caller.send(
-                "\n".join(f"  {k}: {repr(getattr(what, k))}" for k in dir(what))
-            )
-
-        if (m := re.match(r"#(\d+)", query)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(query, then=doit)
-
-    def cmd_setattr(self, caller, query):
+    @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (.*)")
+    def cmd_setattr(self, caller, obj, attr, value):
         """setattr <object> <attribute> <value>: set an attribute on an object.
         <object> can be a # database ID.
         <value> can be a # database ID, otherwise it is a string."""
-        if (match := re.match(r"(#\d+|\w+) ([^ ]+) (.*)", query or "")) is None:
-            raise ActionFailed("Try 'help setattr'.")
+        value = db.dbref(value) or value
+        setattr(obj, attr, value)
 
-        target, attr, value = match.groups()
-        if (match := re.match(r"#(\d+)", value)) is not None:
-            value = db.get(int(match.group(1)))
-
-        def doit(obj):
-            setattr(obj, attr, value)
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_delattr(self, caller, query):
+    @regexp_command("delattr", r"(#\d+|\w+) ([^ ]+)")
+    def cmd_delattr(self, caller, obj, attr):
         """delattr <object> <attribute>: delete an attribute on an object.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) ([^ ]+)", query or "")) is None:
-            raise ActionFailed("Try 'help delattr'.")
+        if not hasattr(obj, attr):
+            raise ActionFailed(f"No attribute '{attr}' on {obj}")
+        delattr(obj, attr)
 
-        target, attr = match.groups()
-
-        def doit(obj):
-            delattr(obj, attr)
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_cmd(self, caller, query):
+    @regexp_command("cmd", r"(#\d+|\w+) ([^ ]+) (.*)")
+    def cmd_cmd(self, caller, thing, cmd, txt):
         """cmd <object> <cmd> <code>: add a command to an object."""
-        if (match := re.match(r"((?:\w+)|(?:#\d+)) ([^ ]+) (.*)", query or "")) is None:
-            raise ActionFailed("Try 'help cmd'.")
-        target, cmd, txt = match.groups()
-        txt = re.sub(r"\\.", lambda x: {"\\n": "\n", "\\\\": "\\"}[x.group(0)], txt)
+        thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing)
+        caller.send(f"Added command {cmd} to {thing.name}")
 
-        def doit(thing):
-            thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing)
-            caller.send(f"Added command {cmd} to {thing.name}")
-
-        if (m := re.match("#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_match(self, caller, query):
+    @regexp_command("match", r"(#\d+|\w+) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)")
+    def cmd_match(self, caller, target, name, regex, code):
         """match <object> [<name>:]<match regexp> <code>: add a matcher to an object.
         <object> can be a # database ID."""
-        m = re.match("(.*) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)", query or "")
-        if m is None:
-            raise ActionFailed("Try 'help match'.")
-        target, name, regex, code = m.groups()
+        action = RegexpAction(regex[1:-1], code, owner=target, name=name)
+        target.custom_cmds[action.name] = action
+        caller.send(f"Added match command {action.name} to {target.name}")
 
-        def doit(target):
-            action = RegexpAction(regex[1:-1], code, owner=target, name=name)
-            target.custom_cmds[action.name] = action
-            caller.send(f"Added match command {action.name} to {target.name}")
-
-        if (m := re.match("#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        return caller.find(target, then=doit)
-
-    def cmd_delcmd(self, caller, query):
+    @regexp_command("delcmd", r"(#\d+|\w+) ([^ ]+)")
+    def cmd_delcmd(self, caller, obj, cmd):
         """delcmd <object> <cmd>: delete a command or match.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) ([^ ]+)", query or "")) is None:
-            raise ActionFailed("Try 'help delcmd'.")
+        if cmd not in getattr(obj, "custom_cmds", {}):
+            raise ActionFailed(f"{obj} does not have command {cmd}")
+        del obj.custom_cmds[cmd]
+        caller.send(f"Deleted command {cmd} from {obj}")
 
-        target, cmd = match.groups()
-
-        def doit(obj):
-            if cmd not in getattr(obj, "custom_cmds", {}):
-                raise ActionFailed(f"{obj} does not have command {cmd}")
-            del obj.custom_cmds[cmd]
-            caller.send(f"Deleted command {cmd} from {obj}")
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_setflag(self, caller, query):
+    @regexp_command("setflag", r"(#\d+|\w+) (\w+)")
+    def cmd_setflag(self, caller, obj, flag):
         """setflag <object> <flag>: set a flag on an object.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
-            raise ActionFailed("Try 'help setflag'.")
+        if not flag in obj.flags:
+            obj.flags.append(flag)
 
-        target, flag = match.groups()
-
-        def doit(obj):
-            if not flag in obj.flags:
-                obj.flags.append(flag)
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_resetflag(self, caller, query):
+    @regexp_command("resetflag", r"(#\d+|\w+) (\w+)")
+    def cmd_resetflag(self, caller, obj, flag):
         """resetflag <object> <flag>: reset a flag on an object.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) (.*)", query or "")) is None:
-            raise ActionFailed("Try 'help resetflag'.")
+        if flag in obj.flags:
+            obj.flags.remove(flag)
 
-        target, flag = match.groups()
-
-        def doit(obj):
-            if flag in obj.flags:
-                obj.flags.remove(flag)
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_setevent(self, caller, query):
+    @regexp_command("setevent", r"(#\d+|\w+) (\w+) (.*)")
+    def cmd_setevent(self, caller, obj, event, code):
         """setevent <object> <event> <code>: set an event handler on an object.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) (\w+) (.*)", query or "")) is None:
-            raise ActionFailed("Try 'help setevent'.")
+        obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
+        caller.send(f"Set event handler {event} on {obj}")
 
-        target, event, code = match.groups()
-
-        def doit(obj):
-            obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
-            caller.send(f"Set event handler {event} on {obj}")
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
-
-    def cmd_delevent(self, caller, query):
+    @regexp_command("delevent", r"(#\d+|\w+) (\w+)")
+    def cmd_delevent(self, caller, obj, event):
         """delevent <object> <event>: delete an event handler on an object.
         <object> can be a # database ID."""
-        if (match := re.match(r"(#\d+|\w+) (\w+)", query or "")) is None:
-            raise ActionFailed("Try 'help delcmd'.")
-
-        target, event = match.groups()
-
-        def doit(obj):
-            if event not in getattr(obj, "custom_event_handlers", {}):
-                raise ActionFailed(f"{obj} does not have event handler {event}")
-            del obj.custom_event_handlers[event]
-            caller.send(f"Deleted event handler {event} from {obj}")
-
-        if (m := re.match(r"#(\d+)", target)) is not None:
-            return doit(db.get(int(m.group(1))))
-        caller.find(target, then=doit)
+        if event not in getattr(obj, "custom_event_handlers", {}):
+            raise ActionFailed(f"{obj} does not have event handler {event}")
+        del obj.custom_event_handlers[event]
+        caller.send(f"Deleted event handler {event} from {obj}")
 
 
 class Digger(MRPower):
@@ -814,19 +722,14 @@ class Maker(MRPower):
         util.moveto(thing, caller.location)
         caller.location.emit(f"{caller.name} makes {name} appear out of thin air.")
 
-    def cmd_destroy(self, caller, query):
+    @regexp_command("destroy", r"(#\d+|\w+)")
+    def cmd_destroy(self, caller, thing):
         """destroy <thing>: destroy things."""
-        if query is None:
-            raise ActionFailed("Destroy what?")
-
-        def doit(thing):
-            if not util.is_thing(thing):
-                raise ActionFailed("You can't destroy that.")
-            caller.emit(caller.name + " violently destroyed " + thing.name + "!")
-            util.moveto(thing, None)
-            db.remove(thing)
-
-        caller.find(query, then=doit)
+        if not util.is_thing(thing):
+            raise ActionFailed("You can't destroy that.")
+        caller.emit(caller.name + " violently destroyed " + thing.name + "!")
+        util.moveto(thing, None)
+        db.remove(thing)
 
 
 class God(Engineer, Maker, SuperDigger):

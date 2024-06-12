@@ -171,3 +171,25 @@ def unescape(input):
         }[match.group(1)]
 
     return re.sub(r"\\(.)", sub, input)
+
+
+# a bit of a circular import, so import at runtime
+def get_db():
+    from .db import db
+    return db
+
+
+def regexp_command(name, regexp):
+    """Used for standard actions on nearby objects."""
+    def _decorator(f):
+        def _out(self, caller, query):
+            if (m := re.match(regexp, query or "")) is None:
+                raise ActionFailed(f"Try 'help {name}'.")
+            target, *args = m.groups()
+
+            if (ref := get_db().dbref(target)) is not None:
+                return f(self, caller, ref, *args)
+            caller.find(target, then=lambda o: f(self, caller, o, *args))
+        _out.__doc__ = f.__doc__
+        return _out
+    return _decorator
