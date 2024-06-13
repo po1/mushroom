@@ -440,21 +440,18 @@ class MRPlayer(MRStuff):
             if arg is None:
                 caller.send("You only see nothing. A lot of nothing.")
                 return
-            caller.send(f"\033[34m{arg.name}\033[0m: {arg.description}")
-            if hasattr(arg, "contents") and not arg.has_flag("opaque"):
-                caller.send("")  # extra newline
-                if arg.contents:
-                    caller.send("Contents:")
-                for thing in arg.contents:
-                    if thing.has_flag('invisible'):
-                        continue
-                    caller.send(" - " + thing.name)
-            if hasattr(arg, "exits") and not arg.has_flag("opaque"):
-                caller.send("")  # extra newline
-                if arg.exits:
-                    caller.send("Nearby places:")
-                for room in arg.exits:
-                    caller.send(" - " + room.name)
+            caller.send(f"\033[34m{arg}\033[0m: {arg.description}")
+            if arg.has_flag("opaque"):
+                return
+            contents = [x for x in getattr(arg, "contents", [])
+                    if not x.has_flag("invisible")]
+            if contents:
+                caller.send("\nContents:")
+                caller.send("\n".join(f" - {thing}" for thing in contents))
+            exits = [x for x in getattr(arg, "exits", [])]
+            if exits:
+                caller.send("\nNearby places:")
+                caller.send("\n".join(f" - {room}" for room in exits))
 
         if caller.location is None:
             notfound = "You see nothing but you."
