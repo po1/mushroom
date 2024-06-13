@@ -385,7 +385,9 @@ class MRPlayer(MRStuff):
     def reachable_objects(self):
         objs = list(self.contents)
         if self.location is not None:
-            objs += [self.location] + self.location.contents + self.location.exits
+            objs += [self.location]
+            objs += getattr(self.location, "contents", [])
+            objs += getattr(self.location, "exits", [])
         return objs
 
     def exec_env(self):
