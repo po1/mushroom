@@ -178,7 +178,6 @@ class MRStuff(MRObject):
                 obj.dispatch('emit', text=msg)
 
 
-
 @register
 class MRThing(MRStuff):
     """
@@ -447,6 +446,8 @@ class MRPlayer(MRStuff):
                 if arg.contents:
                     caller.send("Contents:")
                 for thing in arg.contents:
+                    if thing.has_flag('invisible'):
+                        continue
                     caller.send(" - " + thing.name)
             if hasattr(arg, "exits") and not arg.has_flag("opaque"):
                 caller.send("")  # extra newline
