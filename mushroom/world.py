@@ -341,17 +341,21 @@ class MRPlayer(MRStuff):
         for p in self.get_powers():
             fw_cmds += p._fwcmds  # no custom commands on powers yet
 
-        def addthingcmds(container):
+        def onlyflag(flag, cmds):
+            return [c for c in cmds if flag in c.flags]
+
+        def addthingcmds(container, flag):
             for thing in container.contents:
                 if util.is_thing(thing):
-                    fw_cmds.extend(thing._fwcmds)
-                    custom_cmds.extend(thing.custom_cmds.values())
+                    fw_cmds.extend(onlyflag(flag, thing._fwcmds))
+                    custom_cmds.extend(onlyflag(flag,
+                        thing.custom_cmds.values()))
 
-        addthingcmds(self)
+        addthingcmds(self, 'o')
         if self.location is not None:
-            addthingcmds(self.location)
-            fw_cmds.extend(self.location._fwcmds)
-            custom_cmds.extend(self.location.custom_cmds.values())
+            addthingcmds(self.location, 'p')
+            fw_cmds += onlyflag('i', self.location._fwcmds)
+            custom_cmds += onlyflag('i', self.location.custom_cmds.values())
 
         return custom_cmds + fw_cmds
 
@@ -550,17 +554,19 @@ class Engineer(MRPower):
             raise ActionFailed(f"No attribute '{attr}' on {obj}")
         delattr(obj, attr)
 
-    @regexp_command("cmd", r"(#\d+|\w+) ([^ ]+) (.*)")
-    def cmd_cmd(self, caller, thing, cmd, txt):
-        """cmd <object> <cmd> <code>: add a command to an object."""
-        thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing)
+    @regexp_command("cmd", r"(#\d+|\w+) ([^ :]+)(?::([opi]+))? (.*)")
+    def cmd_cmd(self, caller, thing, cmd, flags, txt):
+        """cmd <object> <cmd>[:<flags>] <code>: add a command to an object.
+           <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
+        thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing, flags=flags)
         caller.send(f"Added command {cmd} to {thing.name}")
 
-    @regexp_command("match", r"(#\d+|\w+) (?:(\w+):)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)")
-    def cmd_match(self, caller, target, name, regex, code):
-        """match <object> [<name>:]<match regexp> <code>: add a matcher to an object.
-        <object> can be a # database ID."""
-        action = RegexpAction(regex[1:-1], code, owner=target, name=name)
+    @regexp_command("match", r"(#\d+|\w+) (?:(\w+)(?::([opi]+))?:)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)")
+    def cmd_match(self, caller, target, name, flags, regex, code):
+        """match <object> [<name>[:<flags>]:]<match regexp> <code>: add a matcher to an object.
+        <object> can be a # database ID.
+        <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
+        action = RegexpAction(regex[1:-1], code, owner=target, name=name, flags=flags)
         target.custom_cmds[action.name] = action
         caller.send(f"Added match command {action.name} to {target.name}")
 

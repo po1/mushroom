@@ -1,8 +1,11 @@
 import re
 import threading
 
-from .commands import ActionFailed
 from .register import get_type
+
+
+class ActionFailed(Exception):
+    pass
 
 
 def is_type(thing, type):
@@ -193,3 +196,20 @@ def regexp_command(name, regexp):
         _out.__doc__ = f.__doc__
         return _out
     return _decorator
+
+
+class Updatable:
+    def __setstate__(self, odict):
+        self.__dict__.update(odict)
+        self._checkfields()
+
+    @classmethod
+    def _get_dummy(cls):
+        return cls()  # this will fail if the constructor is not trivial
+
+    def _checkfields(self):
+        dummy = self._get_dummy()
+        for d in dummy.__dict__:
+            if d not in self.__dict__:
+                logger.debug(f'Adding {d} to {repr(self)}')
+                setattr(self, d, getattr(dummy, d))

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import logging
 import re
 
 from .object import proxify
+from .util import ActionFailed, Updatable
 
-
-class ActionFailed(Exception):
-    pass
+logger = logging.getLogger(__name__)
+DEFAULT_FLAGS = 'o'  # (o)wner (p)eer (i)nterior
 
 
 def run_code(caller, code, owner=None, **kwargs):
@@ -40,16 +41,22 @@ class Action:
         return False
 
 
-class RegexpAction(Action):
-    def __init__(self, regexp, code, name=None, owner=None):
+class RegexpAction(Action, Updatable):
+    def __init__(self, regexp, code, name=None, owner=None, flags=None):
         self.regexp = re.compile(regexp)
         self.code = code
         self.owner = owner
         self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
+        self.flags = flags or DEFAULT_FLAGS
+
+    # for Updatable
+    @classmethod
+    def _get_dummy(cls):
+        return cls('dummy', None)
 
     def __repr__(self) -> str:
-        return f"<match {self.name}: {repr(self.regexp.pattern)} -> {self.code}>"
+        return f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {self.code}>"
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
@@ -85,29 +92,39 @@ class WrapperCommand(BaseCommand):
 
     help_text = "No help available"
 
-    def __init__(self, cmd, func):
+    def __init__(self, cmd, func, flags=None):
         self.name = cmd
         self.func = func
         self.help_text = func.__doc__ or self.help_text
+        self.flags = flags or DEFAULT_FLAGS
+
+    def __repr__(self):
+        return f"<built-in command {self.name}>"
 
     def run(self, caller, query):
         if self.func:
             self.func(caller, query)
 
 
-class CustomCommand(BaseCommand):
+class CustomCommand(BaseCommand, Updatable):
     """For user-supplied scripts."""
 
     help_text = "No help available"
 
-    def __init__(self, name, txt, owner):
+    def __init__(self, name, txt, owner, flags=None):
         self.name = name
         self.txt = txt
         self.owner = owner
+        self.flags = flags or DEFAULT_FLAGS
+
+    # for Updatable
+    @classmethod
+    def _get_dummy(cls):
+        return cls(None, None, None)
 
     def __repr__(self):
         txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
-        return f"<cmd {self.name}: {txt}>"
+        return f"<cmd {self.name}[{self.flags}]: {txt}>"
 
     def run(self, caller, query):
         run_code(caller, self.txt, owner=self.owner, query=query)
