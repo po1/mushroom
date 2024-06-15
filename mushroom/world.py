@@ -560,7 +560,8 @@ class Engineer(MRPower):
     def cmd_cmd(self, caller, thing, cmd, flags, txt):
         """cmd <object> <cmd>[:<flags>] <code>: add a command to an object.
            <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
-        thing.custom_cmds[cmd] = CustomCommand(cmd, txt, thing, flags=flags)
+        thing.custom_cmds[cmd] = CustomCommand(cmd,
+                util.unescape(txt), thing, flags=flags)
         caller.send(f"Added command {cmd} to {thing.name}")
 
     @regexp_command("match", r"(#\d+|\w+) (?:(\w+)(?::([opi]+))?:)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)")
@@ -568,7 +569,8 @@ class Engineer(MRPower):
         """match <object> [<name>[:<flags>]:]<match regexp> <code>: add a matcher to an object.
         <object> can be a # database ID.
         <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
-        action = RegexpAction(regex[1:-1], code, owner=target, name=name, flags=flags)
+        action = RegexpAction(regex[1:-1],
+                util.unescape(code), owner=target, name=name, flags=flags)
         target.custom_cmds[action.name] = action
         caller.send(f"Added match command {action.name} to {target.name}")
 
