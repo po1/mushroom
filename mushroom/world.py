@@ -354,8 +354,10 @@ class MRPlayer(MRStuff):
         addthingcmds(self, 'o')
         if self.location is not None:
             addthingcmds(self.location, 'p')
-            fw_cmds += onlyflag('i', self.location._fwcmds)
-            custom_cmds += onlyflag('i', self.location.custom_cmds.values())
+            room_flag = '' if util.is_room(self.location) else 'i'
+            fw_cmds += onlyflag(room_flag, self.location._fwcmds)
+            custom_cmds += onlyflag(room_flag,
+                    self.location.custom_cmds.values())
 
         return custom_cmds + fw_cmds
 
