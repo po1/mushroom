@@ -83,7 +83,7 @@ class Database:
             return self.search("", type)
 
     def dbref(self, query):
-        if (m := re.match(r'#(\d+)', query)) is None:
+        if (m := re.match(r"#(\d+)", query)) is None:
             return None
         return self.get(int(m.group(1)))
 

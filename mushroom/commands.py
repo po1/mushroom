@@ -7,7 +7,7 @@ from .object import proxify
 from .util import ActionFailed, Updatable
 
 logger = logging.getLogger(__name__)
-DEFAULT_FLAGS = 'o'  # (o)wner (p)eer (i)nterior
+DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
 
 
 def run_code(caller, code, owner=None, **kwargs):
@@ -53,7 +53,7 @@ class RegexpAction(Action, Updatable):
     # for Updatable
     @classmethod
     def _get_dummy(cls):
-        return cls('dummy', None)
+        return cls("dummy", None)
 
     def __repr__(self) -> str:
         return f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {self.code}>"

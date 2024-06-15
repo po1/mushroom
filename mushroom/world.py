@@ -8,7 +8,13 @@ import threading
 import time
 
 from . import util
-from .commands import CustomCommand, RegexpAction, WrapperCommand, ActionFailed, EventHandler
+from .commands import (
+    CustomCommand,
+    RegexpAction,
+    WrapperCommand,
+    ActionFailed,
+    EventHandler,
+)
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
@@ -175,7 +181,7 @@ class MRStuff(MRObject):
             return
         for obj in self.location.contents:
             if obj != self:
-                obj.dispatch('emit', text=msg)
+                obj.dispatch("emit", text=msg)
 
 
 @register
@@ -230,7 +236,7 @@ class MRRoom(MRObject):
     def emit(self, msg):
         """emit <stuff>: display text to all connected players in the room."""
         for thing in self.contents:
-            thing.dispatch('emit', text=msg)
+            thing.dispatch("emit", text=msg)
 
     def cmd_say(self, caller, rest):
         """say <stuff>: say something out loud where you are."""
@@ -348,16 +354,14 @@ class MRPlayer(MRStuff):
             for thing in container.contents:
                 if util.is_thing(thing):
                     fw_cmds.extend(onlyflag(flag, thing._fwcmds))
-                    custom_cmds.extend(onlyflag(flag,
-                        thing.custom_cmds.values()))
+                    custom_cmds.extend(onlyflag(flag, thing.custom_cmds.values()))
 
-        addthingcmds(self, 'o')
+        addthingcmds(self, "o")
         if self.location is not None:
-            addthingcmds(self.location, 'p')
-            room_flag = '' if util.is_room(self.location) else 'i'
+            addthingcmds(self.location, "p")
+            room_flag = "" if util.is_room(self.location) else "i"
             fw_cmds += onlyflag(room_flag, self.location._fwcmds)
-            custom_cmds += onlyflag(room_flag,
-                    self.location.custom_cmds.values())
+            custom_cmds += onlyflag(room_flag, self.location.custom_cmds.values())
 
         return custom_cmds + fw_cmds
 
@@ -449,8 +453,9 @@ class MRPlayer(MRStuff):
             caller.send(f"\033[34m{arg}\033[0m: {arg.description}")
             if arg.has_flag("opaque"):
                 return
-            contents = [x for x in getattr(arg, "contents", [])
-                    if not x.has_flag("invisible")]
+            contents = [
+                x for x in getattr(arg, "contents", []) if not x.has_flag("invisible")
+            ]
             if contents:
                 caller.send("\nContents:")
                 caller.send("\n".join(f" - {thing}" for thing in contents))
@@ -536,9 +541,7 @@ class Engineer(MRPower):
         """examine <object>: display commands and attributes of an object.
         <object> can be a # database ID."""
         caller.send(f"{repr(obj)}:")
-        caller.send(
-            "\n".join(f"  {k}: {repr(getattr(obj, k))}" for k in dir(obj))
-        )
+        caller.send("\n".join(f"  {k}: {repr(getattr(obj, k))}" for k in dir(obj)))
 
     @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (.*)")
     def cmd_setattr(self, caller, obj, attr, value):
@@ -559,18 +562,23 @@ class Engineer(MRPower):
     @regexp_command("cmd", r"(#\d+|\w+) ([^ :]+)(?::([opi]+))? (.*)")
     def cmd_cmd(self, caller, thing, cmd, flags, txt):
         """cmd <object> <cmd>[:<flags>] <code>: add a command to an object.
-           <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
-        thing.custom_cmds[cmd] = CustomCommand(cmd,
-                util.unescape(txt), thing, flags=flags)
+        <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
+        thing.custom_cmds[cmd] = CustomCommand(
+            cmd, util.unescape(txt), thing, flags=flags
+        )
         caller.send(f"Added command {cmd} to {thing.name}")
 
-    @regexp_command("match", r"(#\d+|\w+) (?:(\w+)(?::([opi]+))?:)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)")
+    @regexp_command(
+        "match",
+        r"(#\d+|\w+) (?:(\w+)(?::([opi]+))?:)?(\"(?:[^\"]*)\"|'(?:[^']*)') (.*)",
+    )
     def cmd_match(self, caller, target, name, flags, regex, code):
         """match <object> [<name>[:<flags>]:]<match regexp> <code>: add a matcher to an object.
         <object> can be a # database ID.
         <flags> can be one or more of (o)wner, (p)eer, (i)interior."""
-        action = RegexpAction(regex[1:-1],
-                util.unescape(code), owner=target, name=name, flags=flags)
+        action = RegexpAction(
+            regex[1:-1], util.unescape(code), owner=target, name=name, flags=flags
+        )
         target.custom_cmds[action.name] = action
         caller.send(f"Added match command {action.name} to {target.name}")
 
