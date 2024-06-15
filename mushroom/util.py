@@ -1,8 +1,10 @@
+import logging
 import re
 import threading
 
 from .register import get_type
 
+logger = logging.getLogger(__name__)
 
 class ActionFailed(Exception):
     pass
