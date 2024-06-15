@@ -71,8 +71,9 @@ class HelpCommand(BaseCommand):
         if not matchs:
             caller.send("Command {} was not found".format(cmd_name))
             return
-        cmd = matchs[0]
-        caller.send(f"{cmd.help_text}")
+        if len(matchs) > 1:
+            caller.send("Multiple commands were found:")
+        caller.send("\n".join(cmd.help_text for cmd in matchs))
 
 
 class Client:
