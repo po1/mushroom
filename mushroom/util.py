@@ -213,5 +213,4 @@ class Updatable:
         dummy = self._get_dummy()
         for d in dummy.__dict__:
             if d not in self.__dict__:
-                logger.debug(f'Adding {d} to {repr(self)}')
                 setattr(self, d, getattr(dummy, d))
