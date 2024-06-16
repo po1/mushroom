@@ -317,6 +317,7 @@ class MRPlayer(MRStuff):
         "describe": "cmd_describe",
     }
     fw_event_handlers = {
+        "connect": "on_connect",
         "emit": "on_emit",
     }
     default_description = "A non-descript citizen."
@@ -465,6 +466,9 @@ class MRPlayer(MRStuff):
 
     def on_emit(self, text):
         self.send(text)
+
+    def on_connect(self):
+        self.cmd_look(self, 'here')
 
 
 class MRPower:
