@@ -198,11 +198,6 @@ class MRThing(MRStuff):
         self.powers = []
         super().__init__(name)
 
-    def __setstate__(self, odict):
-        if "location" not in odict:
-            odict["location"] = odict.pop("_parent", None)
-        super().__setstate__(odict)
-
     # need this as a /dev/null sink for event handlers
     def send(self, msg):
         pass
@@ -225,6 +220,7 @@ class MRRoom(MRObject):
         "emit": "cmd_emit",
         "take": "cmd_take",
         "drop": "cmd_drop",
+        "go": "cmd_go",
     }
     default_description = "A blank room."
 
@@ -258,9 +254,9 @@ class MRRoom(MRObject):
                 return caller.emit(
                     f"{caller.name} tries to fold themselves into their own pocket, but fails."
                 )
-            if "big" in obj.flags:
+            if obj.has_flag("big"):
                 raise ActionFailed(f"{obj} is too big.")
-            if not util.is_thing(obj) and not "big" in caller.flags:
+            if not util.is_thing(obj) and not caller.has_flag("big"):
                 raise ActionFailed(f"{obj} won't fit in your pocket.")
 
             util.moveto(obj, caller)
@@ -286,6 +282,27 @@ class MRRoom(MRObject):
             then=doit,
         )
 
+    def cmd_go(self, caller, query):
+        """go [to] <place>: move to a different place."""
+        m = re.match(r"(?:to )?(.*)", query or "")
+        if m is None:
+            raise ActionFailed("Go where?")
+        place = m.group(1)
+
+        def doit(arg):
+            caller.location.emit(caller.name + " has gone to " + arg.name)
+            arg.emit(caller.name + " arrives from " + caller.location.name)
+            util.moveto(caller, arg)
+            caller.cmd_look(caller, "here")
+
+        util.find(
+            place,
+            objects=caller.location.exits,
+            notfound=f"There doesn't seem to be a place named '{place}' nearby.",
+            then=doit,
+        )
+
+
 
 @register
 class MRPlayer(MRStuff):
@@ -297,7 +314,6 @@ class MRPlayer(MRStuff):
     fancy_name = "player"
     fw_cmds = {
         "look": "cmd_look",
-        "go": "cmd_go",
         "describe": "cmd_describe",
     }
     fw_event_handlers = {
@@ -315,6 +331,7 @@ class MRPlayer(MRStuff):
             # First player gets all powers. Dibs!
             self.powers.append(God())
         elif (default_room := confs[0].default_room) is not None:
+            default_room.emit(f'{self} materializes into the room.')
             util.moveto(self, default_room)
 
     def __getstate__(self):
@@ -323,8 +340,6 @@ class MRPlayer(MRStuff):
         return odict
 
     def __setstate__(self, odict):
-        if "location" not in odict:
-            odict["location"] = odict.pop("_parent", None)
         super().__setstate__(odict)
         self.client = None
 
@@ -418,28 +433,6 @@ class MRPlayer(MRStuff):
             raise ActionFailed("There is nothing to describe.")
         thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
         caller.send("Added description of {}".format(thing.name))
-
-    def cmd_go(self, caller, query):
-        """go [to] <place>: move to a different place."""
-        if caller.location is None:
-            raise ActionFailed("You're nowhere. And can't go anywhere :'(")
-        m = re.match(r"(?:to )?(.*)", query or "")
-        if m is None:
-            raise ActionFailed("Go where?")
-        place = m.group(1)
-
-        def doit(arg):
-            caller.location.emit(caller.name + " has gone to " + arg.name)
-            arg.emit(caller.name + " arrives from " + caller.location.name)
-            util.moveto(self, arg)
-            caller.cmd_look(self, "here")
-
-        util.find(
-            place,
-            objects=caller.location.exits,
-            notfound=f"There doesn't seem to be a place named '{place}' nearby.",
-            then=doit,
-        )
 
     def cmd_look(self, caller, query):
         """look [at] [object]: see descriptions of things, people or places."""
