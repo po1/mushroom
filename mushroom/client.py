@@ -1,4 +1,5 @@
 import logging
+import time
 
 from . import util
 from .db import db
@@ -123,6 +124,8 @@ class Client:
         """
         cmds = self.available_cmds()
         caller = self.player or self
+        if self.player is not None:
+            self.player.last_activity = time.time()
         for cmd in cmds:
             try:
                 if cmd.match(caller, data.strip()):
