@@ -2,6 +2,7 @@
 
 <head>
     <title>A simple netcat client</title>
+    <link rel="icon">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <style>
         body {
@@ -92,6 +93,28 @@
                 return `<span>${colored}</span>`;
             }
 
+            document.addEventListener("visibilitychange", () => {
+                if (!document.hidden) {
+                    $('link')[0].href = 'favicon.ico';
+                }
+            });
+
+            function notifyActivity() {
+                if (document.hasFocus()) {
+                    return;
+                }
+
+                let c = document.createElement('canvas');
+                c.width = 16;
+                c.height = 16;
+                let ctx = c.getContext('2d');
+                ctx.fillStyle = "red";
+                ctx.beginPath();
+                ctx.arc(7, 7, 3, 0, 2*Math.PI);
+                ctx.fill();
+                $('link')[0].href = c.toDataURL();
+            }
+
             $('.input').keydown(e => {
                 if (e.key == "ArrowUp") {
                     if (history_cursor === undefined) {
@@ -152,6 +175,7 @@
                         const sh = $('.console-text').get(0).scrollHeight;
                         $('.console-text').append(colorize(text)).scrollTop(sh);
                     });
+                    notifyActivity();
                 };
             });
         });
