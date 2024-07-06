@@ -222,3 +222,38 @@ class Updatable:
         for d in dummy.__dict__:
             if d not in self.__dict__:
                 setattr(self, d, getattr(dummy, d))
+
+
+def color(fg, bg=None):
+    bg = f';{bg+10}' if bg else ''
+    return f'\033[{fg}{bg}m'
+
+
+class Color:
+    normal = 0
+
+    black = 30
+    red = 31
+    green = 32
+    yellow = 33
+    blue = 34
+    magenta = 35
+    cyan = 36
+    white = 37
+
+    bright_black = gray = 90
+    bright_red = 91
+    bright_green = 92
+    bright_yellow = 93
+    bright_blue = 94
+    bright_magenta = 95
+    bright_cyan = 96
+    bright_white = 97
+
+
+def color_eval_env():
+    return {c: color(getattr(Color, c)) for c in dir(Color) if not c.startswith('_')}
+
+
+def format_color(s):
+    return s.format(**color_eval_env())

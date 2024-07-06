@@ -232,7 +232,7 @@ class MRRoom(MRObject):
     def emit(self, msg):
         """emit <stuff>: display text to all connected players in the room."""
         for thing in self.contents:
-            thing.dispatch("emit", text=msg)
+            thing.dispatch("emit", text=util.format_color(msg))
 
     def cmd_say(self, caller, rest):
         """say <stuff>: say something out loud where you are."""
@@ -444,7 +444,8 @@ class MRPlayer(MRStuff):
             if arg is None:
                 caller.send("You only see nothing. A lot of nothing.")
                 return
-            caller.send(f"\033[34m{arg}\033[0m: {arg.description}")
+            colordesc = util.format_color(arg.description)
+            caller.send(f"\033[34m{arg}\033[0m: {colordesc}")
             if arg.has_flag("opaque"):
                 return
             contents = [
