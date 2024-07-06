@@ -95,7 +95,7 @@
 
             document.addEventListener("visibilitychange", () => {
                 if (!document.hidden) {
-                    $('link')[0].href = 'favicon.ico';
+                    $('link')[0].href = document.createElement('canvas').toDataURL();
                 }
             });
 
