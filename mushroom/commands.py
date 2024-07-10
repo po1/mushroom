@@ -177,4 +177,5 @@ class EventHandler:
         return f"<event handler: {txt}>"
 
     def run(self, caller=None, **kwargs):
+        caller = caller or self.owner
         run_code(caller, self.code, owner=self.owner, **kwargs)
