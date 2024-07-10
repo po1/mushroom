@@ -160,6 +160,7 @@ class Config(MRObject):
     def __init__(self, name="config"):
         super().__init__(name)
         self.default_room = None
+        self.master_room = None
 
 
 class MRStuff(MRObject):
@@ -366,7 +367,7 @@ class MRPlayer(MRStuff):
         def onlyflag(flag, cmds):
             return [c for c in cmds if flag in c.flags]
 
-        def addthingcmds(container, flag):
+        def addthingcmds(container, flag=""):
             for thing in container.contents:
                 if util.is_thing(thing):
                     fw_cmds.extend(onlyflag(flag, thing._fwcmds))
@@ -378,6 +379,10 @@ class MRPlayer(MRStuff):
             room_flag = "" if util.is_room(self.location) else "i"
             fw_cmds += onlyflag(room_flag, self.location._fwcmds)
             custom_cmds += onlyflag(room_flag, self.location.custom_cmds.values())
+
+        config = db.search(type=Config)[0]
+        if (master_room := getattr(config, "master_room", None)) is not None:
+            addthingcmds(master_room)
 
         return custom_cmds + fw_cmds
 

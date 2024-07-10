@@ -109,7 +109,7 @@ class Client:
             logging.error(f"Could not send to {self.name}")
 
     def broadcast(self, msg):
-        self.handler.broadcast(f"{msg}\n")
+        self.handler.broadcast(f"{msg}")
 
     def available_cmds(self):
         cmds = list(self.cmds)
