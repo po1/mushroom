@@ -481,14 +481,20 @@ class MRPower:
     fw_cmds = {}
     flags = []
 
-    def __init__(self):
+    def __init__(self, name=None):
         self.initcommands()
+        self.name = name or self.__class__.__name__
+
+    def __dir__(self):
+        return [x for x in self.__dict__ if not x.startswith('_')]
 
     def __repr__(self):
-        return f"<power {self.__class__.__name__}>"
+        return f"<power {self.name}>"
 
     def __setstate__(self, odict):
         self.initcommands()
+        if not hasattr(self, 'name'):
+            self.name = self.__class__.__name__
 
     def __getstate__(self):
         odict = dict(self.__dict__)
