@@ -260,6 +260,9 @@ class MRRoom(MRObject):
             if not util.is_thing(obj) and not caller.has_flag("big"):
                 raise ActionFailed(f"{obj} won't fit in your pocket.")
 
+            # last chance to raise an ActionFailed
+            obj.dispatch("taken", caller=caller)
+
             util.moveto(obj, caller)
             self.emit(f"{caller.name} puts {obj.name} in their pocket.")
 

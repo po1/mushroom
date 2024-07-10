@@ -10,19 +10,23 @@ logger = logging.getLogger(__name__)
 DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
 
 
-def run_code(caller, code, owner=None, **kwargs):
-    locs = {
+def code_env(caller, owner=None, **kwargs):
+    return {
         "send": caller.send,
         "self": proxify(owner),
         "caller": proxify(caller),
         "here": proxify(caller.location),
+        "ActionFailed": ActionFailed,
         **caller.exec_env(),
         **kwargs,
     }
+
+
+def run_code(caller, code, owner=None, **kwargs):
     try:
-        exec(code, locs)
+        exec(code, code_env(caller, owner=owner, **kwargs))
     except ActionFailed as e:
-        caller.send(str(e))
+        raise
     except Exception as e:
         caller.send(f"command failed: ({e.__class__.__name__}) {e}")
 
@@ -172,5 +176,5 @@ class EventHandler:
         txt = self.code.replace("\\", "\\\\").replace("\n", "\\n")
         return f"<event handler: {txt}>"
 
-    def run(self, **kwargs):
-        run_code(self.owner, self.code, owner=self.owner, **kwargs)
+    def run(self, caller=None, **kwargs):
+        run_code(caller, self.code, owner=self.owner, **kwargs)

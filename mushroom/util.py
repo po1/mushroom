@@ -38,7 +38,7 @@ def match_name(short, name):
 
 
 def match_list(short, elts):
-    exact_matches = [x for x in elts if x.name.lower() == short.lower ()]
+    exact_matches = [x for x in elts if x.name.lower() == short.lower()]
     if exact_matches:
         return [exact_matches[0]]  # the user can't be more specific anyway
     return [x for x in elts if match_name(short, x.name)]
