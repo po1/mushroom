@@ -621,6 +621,7 @@ class Engineer(MRPower):
     def cmd_setevent(self, caller, obj, event, code):
         """setevent <object> <event> <code>: set an event handler on an object.
         <object> can be a # database ID."""
+        code = util.unescape(code)
         obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
         caller.send(f"Set event handler {event} on {obj}")
 
