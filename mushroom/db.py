@@ -108,6 +108,9 @@ class DbProxy:
     def __repr__(self):
         return "<Database db>"
 
+    def __call__(self, obj_id):
+        return self.get(obj_id)
+
     @classmethod
     def __dir__(cls):
         return [x for x in cls.__dict__ if not x.startswith("_")]
