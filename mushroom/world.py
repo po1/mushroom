@@ -204,6 +204,12 @@ class MRStuff(MRObject):
             if obj != self:
                 obj.dispatch("emit", text=msg)
 
+    def clone(self):
+        obj = super().clone()
+        obj.contents = []
+        obj.location = None
+        return obj
+
 
 @register
 class MRThing(MRStuff):
