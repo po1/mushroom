@@ -4,7 +4,7 @@ import logging
 import re
 
 from .object import proxify
-from .util import ActionFailed, Updatable
+from .util import ActionFailed, Updatable, escape
 
 logger = logging.getLogger(__name__)
 DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
@@ -60,7 +60,8 @@ class RegexpAction(Action, Updatable):
         return cls("dummy", None)
 
     def __repr__(self) -> str:
-        return f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {self.code}>"
+        txt = escape(self.code)
+        return f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {txt}>"
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
@@ -127,7 +128,7 @@ class CustomCommand(BaseCommand, Updatable):
         return cls(None, None, None)
 
     def __repr__(self):
-        txt = self.txt.replace("\\", "\\\\").replace("\n", "\\n")
+        txt = escape(self.txt)
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
 
     def run(self, caller, query):
@@ -173,7 +174,7 @@ class EventHandler:
         self.owner = owner
 
     def __repr__(self):
-        txt = self.code.replace("\\", "\\\\").replace("\n", "\\n")
+        txt = escape(self.code)
         return f"<event handler: {txt}>"
 
     def run(self, caller=None, **kwargs):
