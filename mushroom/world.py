@@ -1,5 +1,6 @@
 import bisect
 from collections.abc import Iterable
+import copy
 import queue
 import itertools
 import logging
@@ -136,6 +137,25 @@ class MRObject(BaseObject):
         self.__dict__.update(odict)
         self._initcmds()
         self._checkfields()
+
+    def clone(self):
+        obj = self.__class__(self.name)
+        for attr, value in self.__dict__.items():
+            if attr.startswith('_'):
+                continue
+            if isinstance(value, (list, dict)):
+                setattr(obj, attr, value.copy())
+            else:
+                setattr(obj, attr, value)
+        obj.custom_cmds = {k: copy.copy(v) for k, v in self.custom_cmds.items()}
+        obj.custom_event_handlers = {k: copy.copy(v)
+                for k, v in self.custom_event_handlers.items()}
+        for cmd in obj.custom_cmds.values():
+            cmd.owner = obj
+        for handler in obj.custom_event_handlers.values():
+            handler.owner = obj
+        obj._initcmds()
+        return obj
 
     @classmethod
     def _get_dummy(cls):
