@@ -162,6 +162,7 @@
                 ws.onerror = console.log;
                 ws.onclose = e => {
                     $('.online-status').hide();
+                    $('input[type=button]').prop('value', 'Connect');
                 };
                 ws.onopen = e => {
                     $('.online-status').show();
@@ -182,7 +183,6 @@
 
             function disconnect() {
                 ws.close();
-                $('input[type=button]').prop('value', 'Connect');
             }
 
             $('input[type=button]').click(() => {
