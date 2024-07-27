@@ -646,7 +646,7 @@ class Engineer(MRPower):
         if flag in obj.flags:
             obj.flags.remove(flag)
 
-    @regexp_command("setevent", r"(#\d+|\w+) (\w+) (.*)")
+    @regexp_command("setevent", r"(#\d+|\w+) ([^ ]+) (.*)")
     def cmd_setevent(self, caller, obj, event, code):
         """setevent <object> <event> <code>: set an event handler on an object.
         <object> can be a # database ID."""
@@ -654,7 +654,7 @@ class Engineer(MRPower):
         obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
         caller.send(f"Set event handler {event} on {obj}")
 
-    @regexp_command("delevent", r"(#\d+|\w+) (\w+)")
+    @regexp_command("delevent", r"(#\d+|\w+) ([^ ]+)")
     def cmd_delevent(self, caller, obj, event):
         """delevent <object> <event>: delete an event handler on an object.
         <object> can be a # database ID."""
