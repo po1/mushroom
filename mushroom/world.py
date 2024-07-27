@@ -192,6 +192,10 @@ class MRStuff(MRObject):
     Stuff that can be in rooms. Things or players.
     """
 
+    fw_event_handlers = {
+        "look": "on_look",
+    }
+
     def __init__(self, name):
         self.location = None
         self.contents = []
@@ -213,6 +217,18 @@ class MRStuff(MRObject):
         obj.contents = []
         obj.location = None
         return obj
+
+    def on_look(self, caller):
+        colordesc = util.format_color(self.description)
+        caller.send(f"\033[34m{self}\033[0m: {colordesc}")
+        if self.has_flag("opaque"):
+            return
+        contents = [
+            x for x in getattr(self, "contents", []) if not x.has_flag("invisible")
+        ]
+        if contents:
+            caller.send("\nContents:")
+            caller.send("\n".join(f" - {thing}" for thing in contents))
 
 
 @register
@@ -252,6 +268,9 @@ class MRRoom(MRObject):
         "take": "cmd_take",
         "drop": "cmd_drop",
         "go": "cmd_go",
+    }
+    fw_event_handlers = {
+        "look": "on_look",
     }
     default_description = "A blank room."
 
@@ -336,6 +355,18 @@ class MRRoom(MRObject):
             then=doit,
         )
 
+    def on_look(self, caller):
+        colordesc = util.format_color(self.description)
+        caller.send(f"\033[34m{self}\033[0m: {colordesc}")
+        if self.has_flag("opaque"):
+            return
+        contents = [x for x in self.contents if not x.has_flag("invisible")]
+        if contents:
+            caller.send("\nContents:")
+            caller.send("\n".join(f" - {thing}" for thing in contents))
+        if self.exits:
+            caller.send("\nNearby places:")
+            caller.send("\n".join(f" - {room}" for room in self.exits))
 
 @register
 class MRPlayer(MRStuff):
@@ -352,6 +383,7 @@ class MRPlayer(MRStuff):
     fw_event_handlers = {
         "connect": "on_connect",
         "emit": "on_emit",
+        **MRStuff.fw_event_handlers,
     }
     default_description = "A non-descript citizen."
 
@@ -481,20 +513,7 @@ class MRPlayer(MRStuff):
             if arg is None:
                 caller.send("You only see nothing. A lot of nothing.")
                 return
-            colordesc = util.format_color(arg.description)
-            caller.send(f"\033[34m{arg}\033[0m: {colordesc}")
-            if arg.has_flag("opaque"):
-                return
-            contents = [
-                x for x in getattr(arg, "contents", []) if not x.has_flag("invisible")
-            ]
-            if contents:
-                caller.send("\nContents:")
-                caller.send("\n".join(f" - {thing}" for thing in contents))
-            exits = [x for x in getattr(arg, "exits", [])]
-            if exits:
-                caller.send("\nNearby places:")
-                caller.send("\n".join(f" - {room}" for room in exits))
+            arg.dispatch("look", caller=caller)
 
         if caller.location is None:
             notfound = "You see nothing but you."
