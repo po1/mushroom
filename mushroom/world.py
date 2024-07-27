@@ -142,6 +142,10 @@ class MRObject(BaseObject):
         for attr, value in self.__dict__.items():
             if attr.startswith("_"):
                 continue
+            if attr in ("custom_cmds", "custom_event_handlers"):
+                continue
+            if attr == "contents":
+                obj.contents = []
             if isinstance(value, (list, dict)):
                 setattr(obj, attr, value.copy())
             else:
