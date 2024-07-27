@@ -132,7 +132,9 @@ class Client:
                 if cmd.match(caller, data.strip()):
                     return
             except ActionFailed as e:
-                self.send(str(e))
+                # permit silent failures
+                if e.args:
+                    self.send(str(e))
                 return
         self.send("Huh?")
 
