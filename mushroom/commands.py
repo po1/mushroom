@@ -61,7 +61,9 @@ class RegexpAction(Action, Updatable):
 
     def __repr__(self) -> str:
         txt = escape(self.code)
-        return f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {txt}>"
+        return (
+            f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {txt}>"
+        )
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:

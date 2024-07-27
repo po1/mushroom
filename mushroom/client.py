@@ -32,7 +32,7 @@ class PlayCommand(BaseCommand):
         caller.name = char.name
         caller.send("You are now playing as {}".format(char.name))
         caller.handler.broadcast_others(f"{char.name} logged in.")
-        caller.player.dispatch('connect')
+        caller.player.dispatch("connect")
 
     def run(self, caller, query):
         if query is None:

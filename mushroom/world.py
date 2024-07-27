@@ -141,15 +141,16 @@ class MRObject(BaseObject):
     def clone(self):
         obj = self.__class__(self.name)
         for attr, value in self.__dict__.items():
-            if attr.startswith('_'):
+            if attr.startswith("_"):
                 continue
             if isinstance(value, (list, dict)):
                 setattr(obj, attr, value.copy())
             else:
                 setattr(obj, attr, value)
         obj.custom_cmds = {k: copy.copy(v) for k, v in self.custom_cmds.items()}
-        obj.custom_event_handlers = {k: copy.copy(v)
-                for k, v in self.custom_event_handlers.items()}
+        obj.custom_event_handlers = {
+            k: copy.copy(v) for k, v in self.custom_event_handlers.items()
+        }
         for cmd in obj.custom_cmds.values():
             cmd.owner = obj
         for handler in obj.custom_event_handlers.values():
@@ -333,7 +334,6 @@ class MRRoom(MRObject):
         )
 
 
-
 @register
 class MRPlayer(MRStuff):
     """
@@ -362,7 +362,7 @@ class MRPlayer(MRStuff):
             # First player gets all powers. Dibs!
             self.powers.append(God())
         elif (default_room := confs[0].default_room) is not None:
-            default_room.emit(f'{self} materializes into the room.')
+            default_room.emit(f"{self} materializes into the room.")
             util.moveto(self, default_room)
 
     def __getstate__(self):
@@ -503,7 +503,7 @@ class MRPlayer(MRStuff):
         self.send(text)
 
     def on_connect(self):
-        self.cmd_look(self, 'here')
+        self.cmd_look(self, "here")
 
 
 class MRPower:
@@ -515,14 +515,14 @@ class MRPower:
         self.name = name or self.__class__.__name__
 
     def __dir__(self):
-        return [x for x in self.__dict__ if not x.startswith('_')]
+        return [x for x in self.__dict__ if not x.startswith("_")]
 
     def __repr__(self):
         return f"<power {self.name}>"
 
     def __setstate__(self, odict):
         self.initcommands()
-        if not hasattr(self, 'name'):
+        if not hasattr(self, "name"):
             self.name = self.__class__.__name__
 
     def __getstate__(self):

@@ -225,8 +225,8 @@ class Updatable:
 
 
 def color(fg, bg=None):
-    bg = f';{bg+10}' if bg else ''
-    return f'\033[{fg}{bg}m'
+    bg = f";{bg+10}" if bg else ""
+    return f"\033[{fg}{bg}m"
 
 
 class Color:
@@ -252,7 +252,7 @@ class Color:
 
 
 def color_eval_env():
-    return {c: color(getattr(Color, c)) for c in dir(Color) if not c.startswith('_')}
+    return {c: color(getattr(Color, c)) for c in dir(Color) if not c.startswith("_")}
 
 
 def format_color(s):
