@@ -112,10 +112,11 @@ class Client:
         self.handler.broadcast(f"{msg}")
 
     def available_cmds(self):
-        cmds = list(self.cmds)
+        cmds = []
         # player will add other commands (e.g. powers, room, etc.)
         if self.player:
             cmds += self.player.cmds
+        cmds += self.cmds
         return cmds
 
     def handle_input(self, data):
