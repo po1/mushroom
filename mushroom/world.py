@@ -368,6 +368,7 @@ class MRRoom(MRObject):
             caller.send("\nNearby places:")
             caller.send("\n".join(f" - {room}" for room in self.exits))
 
+
 @register
 class MRPlayer(MRStuff):
     """
