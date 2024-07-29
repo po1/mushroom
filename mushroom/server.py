@@ -13,6 +13,7 @@ import tomli
 
 from .client import Client
 from .config import Config
+import mushroom.portal
 
 
 class LogFile:
@@ -317,6 +318,10 @@ def main():
         logging.info("Database successfully loaded.")
     except IOError:
         logging.info("Database not found, starting fresh.")
+
+    logging.info(f"Starting portal server")
+    portal_server = mushroom.portal.Server()
+    portal_server.start()
 
     logging.info(f"Starting server on {cfg.listen_address}:{cfg.listen_port}")
     server = Server(cfg, db)
