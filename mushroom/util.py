@@ -1,4 +1,5 @@
 import logging
+import random
 import re
 import threading
 
@@ -257,3 +258,37 @@ def color_eval_env():
 
 def format_color(s):
     return s.format(**color_eval_env())
+
+
+def _pf(obj, indent=2, width=80, newl=False):
+    def _val(k, newl=False):
+        ind = indent * " "
+        return _pf(k, indent=indent, width=width - indent, newl=newl).replace(
+            "\n", f"\n{ind}"
+        )
+
+    # only supports lists and dicts
+    if len(r := repr(obj)) < width - indent:
+        return r
+    if isinstance(obj, list):
+        ind = " " * (indent - 2) + "- "
+        newl = "\n" if newl else ""
+        return newl + "\n".join(f"{ind}{_val(k)}" for k in obj)
+    if isinstance(obj, dict):
+        ind = " " * indent
+        newl = f"\n" if newl else ""
+        keycolor = color(random.randint(31, 36))
+
+        def _keyval(k, v):
+            return f"{keycolor}{k}{color(0)}: {_val(v, newl=True)}"
+
+        return newl + "\n".join(f"{ind}{_keyval(k, v)}" for k, v in obj.items())
+    return repr(obj)
+
+
+def pretty_format(obj, indent=2):
+    """A super-prettiajin-blue.
+
+    Formats to colorful yaml-like syntax with a few niceties."""
+    dirstuff = {k: getattr(obj, k) for k in dir(obj)}
+    return repr(obj) + "\n" + _pf(dirstuff, indent=indent)

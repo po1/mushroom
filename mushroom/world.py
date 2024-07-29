@@ -601,8 +601,7 @@ class Engineer(MRPower):
     def cmd_examine(self, caller, obj):
         """examine <object>: display commands and attributes of an object.
         <object> can be a # database ID."""
-        caller.send(f"{repr(obj)}:")
-        caller.send("\n".join(f"  {k}: {repr(getattr(obj, k))}" for k in dir(obj)))
+        caller.send(util.pretty_format(obj))
 
     @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (.*)")
     def cmd_setattr(self, caller, obj, attr, value):
