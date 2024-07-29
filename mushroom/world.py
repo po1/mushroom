@@ -139,6 +139,18 @@ class MRObject(BaseObject):
         self._initcmds()
         self._checkfields()
 
+    def exec_env(self):
+        import mushroom
+
+        return {
+            "game": game,
+            "db": DbProxy(db),
+            # "unsafe" useful stuff (nothing is really safe)
+            "world": mushroom.world,
+            "util": mushroom.util,
+            "re": re,
+        }
+
     def clone(self):
         obj = self.__class__(self.name)
         for attr, value in self.__dict__.items():
@@ -250,9 +262,6 @@ class MRThing(MRStuff):
     # need this as a /dev/null sink for event handlers
     def send(self, msg):
         logger.warn(f"{repr(self)} was sent: {msg}")
-
-    def exec_env(self):
-        return {}
 
 
 @register
@@ -486,18 +495,6 @@ class MRPlayer(MRStuff):
             objs += getattr(self.location, "contents", [])
             objs += getattr(self.location, "exits", [])
         return objs
-
-    def exec_env(self):
-        import mushroom
-
-        return {
-            "game": game,
-            "db": DbProxy(db),
-            # "unsafe" useful stuff (nothing is really safe)
-            "world": mushroom.world,
-            "util": mushroom.util,
-            "re": re,
-        }
 
     @regexp_command("describe", r"(#\d+|\w+) (.*)")
     def cmd_describe(self, caller, thing, description):
