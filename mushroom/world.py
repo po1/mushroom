@@ -21,6 +21,8 @@ from .object import BaseObject, proxify
 from .register import register
 from .util import regexp_command
 
+logger = logging.getLogger(__name__)
+
 
 class Game:
     def __init__(self) -> None:
@@ -247,7 +249,7 @@ class MRThing(MRStuff):
 
     # need this as a /dev/null sink for event handlers
     def send(self, msg):
-        pass
+        logger.warn(f"{repr(self)} was sent: {msg}")
 
     def exec_env(self):
         return {}
