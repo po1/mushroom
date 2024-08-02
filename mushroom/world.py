@@ -215,6 +215,13 @@ class MRStuff(MRObject):
         self.contents = []
         super().__init__(name)
 
+    def exec_env(self):
+        return {
+            "send": self.send,
+            "here": self.location,
+            **super().exec_env(),
+        }
+
     def emit(self, msg):
         if self.location is not None:
             self.location.emit(msg)

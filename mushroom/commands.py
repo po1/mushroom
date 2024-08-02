@@ -12,10 +12,8 @@ DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
 
 def code_env(caller, owner=None, **kwargs):
     return {
-        "send": caller.send,
         "self": proxify(owner),
         "caller": proxify(caller),
-        "here": proxify(caller.location),
         "ActionFailed": ActionFailed,
         **caller.exec_env(),
         **kwargs,
