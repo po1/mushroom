@@ -153,25 +153,23 @@ class MRObject(BaseObject):
 
     def clone(self):
         obj = self.__class__(self.name)
+        def _copy(item):
+            if isinstance(item, list):
+                return [_copy(x) for x in item]
+            if isinstance(item, dict):
+                return {k: _copy(v) for k, v in item.items()}
+            if isinstance(item, (CustomCommand, EventHandler, RegexpAction)):
+                cmd = copy.copy(item)
+                item.owner = obj
+                return item
+            return item
+
         for attr, value in self.__dict__.items():
             if attr.startswith("_"):
                 continue
-            if attr in ("custom_cmds", "custom_event_handlers"):
-                continue
             if attr == "contents":
                 obj.contents = []
-            if isinstance(value, (list, dict)):
-                setattr(obj, attr, value.copy())
-            else:
-                setattr(obj, attr, value)
-        obj.custom_cmds = {k: copy.copy(v) for k, v in self.custom_cmds.items()}
-        obj.custom_event_handlers = {
-            k: copy.copy(v) for k, v in self.custom_event_handlers.items()
-        }
-        for cmd in obj.custom_cmds.values():
-            cmd.owner = obj
-        for handler in obj.custom_event_handlers.values():
-            handler.owner = obj
+            setattr(obj, attr, _copy(value))
         obj._initcmds()
         return obj
 
