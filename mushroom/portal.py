@@ -102,7 +102,7 @@ class Portal:
 
     # calls from world (i.e. without a running loop)
     def open(self, uri):
-        if self.handler is not None:
+        if self.connected:
             raise ActionFailed("Portal is already open.")
         from mushroom.db import db
 
@@ -110,7 +110,8 @@ class Portal:
             ws = await websockets.connect(uri)
             self.handler = Handler(db, ws, portal=self)
             await self.handler.send("hello", name=self.name)
-            self.world_object.dispatch("portal-connect", portal=self)
+            if self.world_object is not None:
+                self.world_object.dispatch("portal-connect", portal=self)
             await self.handler.process()  # loop forever
 
         self.client_thread = threading.Thread(
@@ -139,7 +140,7 @@ class Portal:
 
     def get_object(self, object_id, cb):
         self.object_requests[object_id] = cb
-        self.handler.call_soon(self.handler.send("get-object", object_id=object_id))
+        self.handler.call_soon(self.handler.send("object-get", object_id=object_id))
 
     # from handler
     async def object_info(self, object_id, obj):
@@ -193,6 +194,8 @@ class Portal:
     def on_close(self):
         if self.world_object is not None:
             self.world_object.dispatch("portal-disconnect", portal=self)
+            for player in self.local_players.values():
+                self.world_object.dispatch("portal-return", player=player)
         for remote_player in self.remote_players.values():
             if remote_player.player is not None:
                 remote_player.player.dispatch("portal-leave")
