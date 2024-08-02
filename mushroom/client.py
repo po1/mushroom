@@ -141,3 +141,4 @@ class Client:
     def on_disconnect(self):
         if self.player is not None:
             self.player.client = None
+            self.player.dispatch("disconnect")
