@@ -614,6 +614,7 @@ class Engineer(MRPower):
         <value> can be a # database ID, otherwise it is a string."""
         value = db.dbref(value) or value
         setattr(obj, attr, value)
+        caller.send(f"Set attribute '{attr}' on {obj}")
 
     @regexp_command("delattr", r"(#\d+|\w+) ([^ ]+)")
     def cmd_delattr(self, caller, obj, attr):
@@ -622,6 +623,7 @@ class Engineer(MRPower):
         if not hasattr(obj, attr):
             raise ActionFailed(f"No attribute '{attr}' on {obj}")
         delattr(obj, attr)
+        caller.send(f"Deleted attribute '{attr}' on {obj}")
 
     @regexp_command("cmd", r"(#\d+|\w+) ([^ :]+)(?::([opi]+))? (.*)")
     def cmd_cmd(self, caller, thing, cmd, flags, txt):
@@ -630,7 +632,7 @@ class Engineer(MRPower):
         thing.custom_cmds[cmd] = CustomCommand(
             cmd, util.unescape(txt), thing, flags=flags
         )
-        caller.send(f"Added command {cmd} to {thing.name}")
+        caller.send(f"Added command '{cmd}' to {thing}")
 
     @regexp_command(
         "match",
@@ -644,7 +646,7 @@ class Engineer(MRPower):
             regex[1:-1], util.unescape(code), owner=target, name=name, flags=flags
         )
         target.custom_cmds[action.name] = action
-        caller.send(f"Added match command {action.name} to {target.name}")
+        caller.send(f"Added match command '{action.name}' to {target}")
 
     @regexp_command("delcmd", r"(#\d+|\w+) ([^ ]+)")
     def cmd_delcmd(self, caller, obj, cmd):
@@ -653,7 +655,7 @@ class Engineer(MRPower):
         if cmd not in getattr(obj, "custom_cmds", {}):
             raise ActionFailed(f"{obj} does not have command {cmd}")
         del obj.custom_cmds[cmd]
-        caller.send(f"Deleted command {cmd} from {obj}")
+        caller.send(f"Deleted command '{cmd}' on {obj}")
 
     @regexp_command("setflag", r"(#\d+|\w+) (\w+)")
     def cmd_setflag(self, caller, obj, flag):
@@ -661,6 +663,7 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         if not flag in obj.flags:
             obj.flags.append(flag)
+        caller.send(f"Set flag '{flag}' on {obj}")
 
     @regexp_command("resetflag", r"(#\d+|\w+) (\w+)")
     def cmd_resetflag(self, caller, obj, flag):
@@ -668,6 +671,7 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         if flag in obj.flags:
             obj.flags.remove(flag)
+        caller.send(f"Reset flag '{flag}' on {obj}")
 
     @regexp_command("setevent", r"(#\d+|\w+) ([^ ]+) (.*)")
     def cmd_setevent(self, caller, obj, event, code):
@@ -675,7 +679,7 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         code = util.unescape(code)
         obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
-        caller.send(f"Set event handler {event} on {obj}")
+        caller.send(f"Set event handler '{event}' on {obj}")
 
     @regexp_command("delevent", r"(#\d+|\w+) ([^ ]+)")
     def cmd_delevent(self, caller, obj, event):
@@ -684,7 +688,7 @@ class Engineer(MRPower):
         if event not in getattr(obj, "custom_event_handlers", {}):
             raise ActionFailed(f"{obj} does not have event handler {event}")
         del obj.custom_event_handlers[event]
-        caller.send(f"Deleted event handler {event} from {obj}")
+        caller.send(f"Deleted event handler '{event}' on {obj}")
 
 
 class Digger(MRPower):
