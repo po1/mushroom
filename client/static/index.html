@@ -166,6 +166,7 @@
                 };
                 ws.onopen = e => {
                     $('.online-status').show();
+                    $('.input').focus();
                 };
                 ws.onmessage = m => {
                     m.data.text().then(text => {
