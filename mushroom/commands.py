@@ -20,14 +20,22 @@ def code_env(caller, owner=None, **kwargs):
     }
 
 
-def run_code(caller, code, owner=None, **kwargs):
+def exec_code(code, caller, owner=None, **kwargs):
     try:
         exec(code, code_env(caller, owner=owner, **kwargs))
     except ActionFailed as e:
         raise
     except Exception as e:
-        caller.send(f"command failed: ({e.__class__.__name__}) {e}")
+        caller.send(f"exec error: ({e.__class__.__name__}) {e}")
 
+
+def eval_code(code, caller, owner=None, **kwargs):
+    try:
+        return eval(code, code_env(caller, owner=owner, **kwargs))
+    except ActionFailed as e:
+        raise
+    except Exception as e:
+        caller.send(f"eval error: ({e.__class__.__name__}) {e}")
 
 class Caller:
     def send(self, text):
@@ -65,7 +73,7 @@ class RegexpAction(Action, Updatable):
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
-            run_code(caller, self.code, owner=self.owner, groups=m.groups())
+            exec_code(self.code, caller, owner=self.owner, groups=m.groups())
             return True
         return False
 
@@ -116,9 +124,9 @@ class CustomCommand(BaseCommand, Updatable):
 
     help_text = "No help available"
 
-    def __init__(self, name, txt, owner, flags=None):
+    def __init__(self, name, code, owner, flags=None):
         self.name = name
-        self.txt = txt
+        self.code = code
         self.owner = owner
         self.flags = flags or DEFAULT_FLAGS
 
@@ -132,7 +140,7 @@ class CustomCommand(BaseCommand, Updatable):
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
 
     def run(self, caller, query):
-        run_code(caller, self.txt, owner=self.owner, query=query)
+        exec_code(self.code, caller, owner=self.owner, query=query)
 
 
 class Answer(Action):
@@ -179,4 +187,4 @@ class EventHandler:
 
     def run(self, caller=None, **kwargs):
         caller = caller or self.owner
-        run_code(caller, self.code, owner=self.owner, **kwargs)
+        exec_code(self.code, caller, owner=self.owner, **kwargs)
