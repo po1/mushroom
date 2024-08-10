@@ -14,6 +14,7 @@ setup(
         "console_scripts": ["mushroomd=mushroom.server:main"],
     },
     install_requires=[
+        "lark",
         "tomli",
         "websockets",
     ],
