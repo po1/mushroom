@@ -3,6 +3,7 @@ import random
 import re
 import threading
 
+from mushroom import template
 from .register import get_type
 
 logger = logging.getLogger(__name__)
@@ -256,8 +257,8 @@ def color_eval_env():
     return {c: color(getattr(Color, c)) for c in dir(Color) if not c.startswith("_")}
 
 
-def format_color(s):
-    return s.format(**color_eval_env())
+def format(s, **context):
+    return template.parse(s, context={**color_eval_env(), **context})
 
 
 def _pf(obj, indent=2, width=80, newl=False):

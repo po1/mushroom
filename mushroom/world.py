@@ -239,7 +239,7 @@ class MRStuff(MRObject):
         return obj
 
     def on_look(self, caller):
-        colordesc = util.format_color(self.description)
+        colordesc = util.format(self.description, self=self)
         caller.send(f"\033[34m{self}\033[0m: {colordesc}")
         if self.has_flag("opaque"):
             return
@@ -299,7 +299,7 @@ class MRRoom(MRObject):
     def emit(self, msg):
         """emit <stuff>: display text to all connected players in the room."""
         for thing in self.contents:
-            thing.dispatch("emit", text=util.format_color(msg))
+            thing.dispatch("emit", text=util.format(msg))
 
     def cmd_say(self, caller, rest):
         """say <stuff>: say something out loud where you are."""
@@ -373,7 +373,7 @@ class MRRoom(MRObject):
         )
 
     def on_look(self, caller):
-        colordesc = util.format_color(self.description)
+        colordesc = util.format(self.description, self=self)
         caller.send(f"\033[34m{self}\033[0m: {colordesc}")
         if self.has_flag("opaque"):
             return
