@@ -154,6 +154,7 @@ class MRObject(BaseObject):
 
     def clone(self):
         obj = self.__class__(self.name)
+
         def _copy(item):
             if isinstance(item, list):
                 return [_copy(x) for x in item]

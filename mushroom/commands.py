@@ -37,6 +37,7 @@ def eval_code(code, caller, owner=None, **kwargs):
     except Exception as e:
         caller.send(f"eval error: ({e.__class__.__name__}) {e}")
 
+
 class Caller:
     def send(self, text):
         pass
