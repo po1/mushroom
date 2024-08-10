@@ -15,6 +15,7 @@ from .commands import (
     WrapperCommand,
     ActionFailed,
     EventHandler,
+    Lambda,
 )
 from .db import db, DbProxy
 from .object import BaseObject, proxify
@@ -581,6 +582,7 @@ class Engineer(MRPower):
 
     def _exec_env(self, caller):
         return {
+            "caller": proxify(caller),
             "self": proxify(caller),
             **caller.exec_env(),
         }
@@ -607,12 +609,14 @@ class Engineer(MRPower):
         <object> can be a # database ID."""
         caller.send(util.pretty_format(obj))
 
-    @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (.*)")
-    def cmd_setattr(self, caller, obj, attr, value):
+    @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (lambda:\s*)?(.*)")
+    def cmd_setattr(self, caller, obj, attr, lbd, value):
         """setattr <object> <attribute> <value>: set an attribute on an object.
         <object> can be a # database ID.
         <value> can be a # database ID, otherwise it is a string."""
         value = db.dbref(value) or value
+        if lbd is not None:
+            value = Lambda(value, obj)
         setattr(obj, attr, value)
         caller.send(f"Set attribute '{attr}' on {obj}")
 

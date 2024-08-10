@@ -188,3 +188,16 @@ class EventHandler:
     def run(self, caller=None, **kwargs):
         caller = caller or self.owner
         exec_code(self.code, caller, owner=self.owner, **kwargs)
+
+
+class Lambda:
+    def __init__(self, code, owner):
+        self.code = code
+        self.owner = owner
+
+    def __repr__(self):
+        return f"<lambda: {self.code}>"
+
+    def __call__(self, caller=None, **kwargs):
+        caller = caller or self.owner
+        return eval_code(self.code, caller, owner=self.owner, **kwargs)
