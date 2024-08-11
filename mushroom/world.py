@@ -160,8 +160,8 @@ class MRObject(BaseObject):
                 return [_copy(x) for x in item]
             if isinstance(item, dict):
                 return {k: _copy(v) for k, v in item.items()}
-            if isinstance(item, (CustomCommand, EventHandler, RegexpAction)):
-                cmd = copy.copy(item)
+            if getattr(item, "owner", None) == self:
+                item = copy.copy(item)
                 item.owner = obj
                 return item
             return item
