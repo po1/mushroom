@@ -142,7 +142,7 @@ class CustomCommand(BaseCommand, Updatable):
         super().__setstate__(odict)
 
     def __repr__(self):
-        txt = escape(self.txt)
+        txt = escape(self.code)
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
 
     def run(self, caller, query):
