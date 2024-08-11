@@ -565,20 +565,74 @@ class MRPower:
         ]
 
 
-class Engineer(MRPower):
+class Examiner(MRPower):
+    fw_cmds = {
+        "examine": "cmd_examine",
+    }
+
+    @regexp_command("examine", r"(#\d+|\w+)")
+    def cmd_examine(self, caller, obj):
+        """examine <object>: display commands and attributes of an object.
+        <object> can be a # database ID."""
+        caller.send(util.pretty_format(obj))
+
+
+class Tinkerer(Examiner):
+    fw_cmds = {
+        "setattr": "cmd_setattr",
+        "delattr": "cmd_delattr",
+        "setflag": "cmd_setflag",
+        "resetflag": "cmd_resetflag",
+        **Examiner.fw_cmds,
+    }
+
+    @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (lambda:\s*)?(.*)")
+    def cmd_setattr(self, caller, obj, attr, lbd, value):
+        """setattr <object> <attribute> <value>: set an attribute on an object.
+        <object> can be a # database ID.
+        <value> can be a # database ID, otherwise it is a string."""
+        value = db.dbref(value) or value
+        if lbd is not None:
+            value = Lambda(value, obj)
+        setattr(obj, attr, value)
+        caller.send(f"Set attribute '{attr}' on {obj}")
+
+    @regexp_command("delattr", r"(#\d+|\w+) ([^ ]+)")
+    def cmd_delattr(self, caller, obj, attr):
+        """delattr <object> <attribute>: delete an attribute on an object.
+        <object> can be a # database ID."""
+        if not hasattr(obj, attr):
+            raise ActionFailed(f"No attribute '{attr}' on {obj}")
+        delattr(obj, attr)
+        caller.send(f"Deleted attribute '{attr}' on {obj}")
+
+    @regexp_command("setflag", r"(#\d+|\w+) (\w+)")
+    def cmd_setflag(self, caller, obj, flag):
+        """setflag <object> <flag>: set a flag on an object.
+        <object> can be a # database ID."""
+        if not flag in obj.flags:
+            obj.flags.append(flag)
+        caller.send(f"Set flag '{flag}' on {obj}")
+
+    @regexp_command("resetflag", r"(#\d+|\w+) (\w+)")
+    def cmd_resetflag(self, caller, obj, flag):
+        """resetflag <object> <flag>: reset a flag on an object.
+        <object> can be a # database ID."""
+        if flag in obj.flags:
+            obj.flags.remove(flag)
+        caller.send(f"Reset flag '{flag}' on {obj}")
+
+
+class Engineer(Tinkerer):
     fw_cmds = {
         "eval": "cmd_eval",
         "exec": "cmd_exec",
-        "examine": "cmd_examine",
-        "setattr": "cmd_setattr",
-        "delattr": "cmd_delattr",
         "cmd": "cmd_cmd",
         "match": "cmd_match",
-        "setflag": "cmd_setflag",
-        "resetflag": "cmd_resetflag",
         "delcmd": "cmd_delcmd",
         "setevent": "cmd_setevent",
         "delevent": "cmd_delevent",
+        **Tinkerer.fw_cmds,
     }
 
     def _exec_env(self, caller):
@@ -603,32 +657,6 @@ class Engineer(MRPower):
         except Exception as e:
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
-
-    @regexp_command("examine", r"(#\d+|\w+)")
-    def cmd_examine(self, caller, obj):
-        """examine <object>: display commands and attributes of an object.
-        <object> can be a # database ID."""
-        caller.send(util.pretty_format(obj))
-
-    @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (lambda:\s*)?(.*)")
-    def cmd_setattr(self, caller, obj, attr, lbd, value):
-        """setattr <object> <attribute> <value>: set an attribute on an object.
-        <object> can be a # database ID.
-        <value> can be a # database ID, otherwise it is a string."""
-        value = db.dbref(value) or value
-        if lbd is not None:
-            value = Lambda(value, obj)
-        setattr(obj, attr, value)
-        caller.send(f"Set attribute '{attr}' on {obj}")
-
-    @regexp_command("delattr", r"(#\d+|\w+) ([^ ]+)")
-    def cmd_delattr(self, caller, obj, attr):
-        """delattr <object> <attribute>: delete an attribute on an object.
-        <object> can be a # database ID."""
-        if not hasattr(obj, attr):
-            raise ActionFailed(f"No attribute '{attr}' on {obj}")
-        delattr(obj, attr)
-        caller.send(f"Deleted attribute '{attr}' on {obj}")
 
     @regexp_command("cmd", r"(#\d+|\w+) ([^ :]+)(?::([opi]+))? (.*)")
     def cmd_cmd(self, caller, thing, cmd, flags, txt):
@@ -661,22 +689,6 @@ class Engineer(MRPower):
             raise ActionFailed(f"{obj} does not have command {cmd}")
         del obj.custom_cmds[cmd]
         caller.send(f"Deleted command '{cmd}' on {obj}")
-
-    @regexp_command("setflag", r"(#\d+|\w+) (\w+)")
-    def cmd_setflag(self, caller, obj, flag):
-        """setflag <object> <flag>: set a flag on an object.
-        <object> can be a # database ID."""
-        if not flag in obj.flags:
-            obj.flags.append(flag)
-        caller.send(f"Set flag '{flag}' on {obj}")
-
-    @regexp_command("resetflag", r"(#\d+|\w+) (\w+)")
-    def cmd_resetflag(self, caller, obj, flag):
-        """resetflag <object> <flag>: reset a flag on an object.
-        <object> can be a # database ID."""
-        if flag in obj.flags:
-            obj.flags.remove(flag)
-        caller.send(f"Reset flag '{flag}' on {obj}")
 
     @regexp_command("setevent", r"(#\d+|\w+) ([^ ]+) (.*)")
     def cmd_setevent(self, caller, obj, event, code):
