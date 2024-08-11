@@ -136,6 +136,11 @@ class CustomCommand(BaseCommand, Updatable):
     def _get_dummy(cls):
         return cls(None, None, None)
 
+    def __setstate__(self, odict):
+        if 'txt' in odict:
+            odict['code'] = odict.pop('txt')
+        super().__setstate__(odict)
+
     def __repr__(self):
         txt = escape(self.txt)
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
