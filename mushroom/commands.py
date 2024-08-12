@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 import re
 
@@ -38,6 +39,27 @@ def eval_code(code, caller, owner=None, **kwargs):
         caller.send(f"eval error: ({e.__class__.__name__}) {e}")
 
 
+class Code:
+    fancy_name = "code"
+
+    def __init__(self, code, owner=None):
+        self.code = code
+        self.owner = owner
+
+    def bind(self, owner):
+        obj = copy.copy(self)
+        obj.owner = owner
+        return obj
+
+    def __repr__(self):
+        txt = escape(self.code)
+        return f"<{self.fancy_name}: {txt}>"
+
+    def __call__(self, caller=None, **kwargs):
+        caller = caller or self.owner
+        exec_code(self.code, caller, owner=self.owner, **kwargs)
+
+
 class Caller:
     def send(self, text):
         pass
@@ -52,11 +74,10 @@ class Action:
         return False
 
 
-class RegexpAction(Action, Updatable):
+class RegexpAction(Action, Updatable, Code):
     def __init__(self, regexp, code, name=None, owner=None, flags=None):
         self.regexp = re.compile(regexp)
-        self.code = code
-        self.owner = owner
+        Code.__init__(self, code, owner)
         self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
         self.flags = flags or DEFAULT_FLAGS
@@ -120,15 +141,14 @@ class WrapperCommand(BaseCommand):
             self.func(caller, query)
 
 
-class CustomCommand(BaseCommand, Updatable):
+class CustomCommand(BaseCommand, Updatable, Code):
     """For user-supplied scripts."""
 
     help_text = "No help available"
 
     def __init__(self, name, code, owner, flags=None):
         self.name = name
-        self.code = code
-        self.owner = owner
+        Code.__init__(self, code, owner)
         self.flags = flags or DEFAULT_FLAGS
 
     # for Updatable
@@ -182,24 +202,12 @@ def add_answer_to(answer, target):
     target.add_cmd(answer)
 
 
-class EventHandler:
-    def __init__(self, code, owner):
-        self.code = code
-        self.owner = owner
-
-    def __repr__(self):
-        txt = escape(self.code)
-        return f"<event handler: {txt}>"
-
-    def __call__(self, caller=None, **kwargs):
-        caller = caller or self.owner
-        exec_code(self.code, caller, owner=self.owner, **kwargs)
+class EventHandler(Code):
+    fancy_name = "event handler"
 
 
-class Lambda:
-    def __init__(self, code, owner):
-        self.code = code
-        self.owner = owner
+class Lambda(Code):
+    fancy_name = "lambda"
 
     def __repr__(self):
         return f"<lambda: {self.code}>"

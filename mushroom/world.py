@@ -16,6 +16,7 @@ from .commands import (
     ActionFailed,
     EventHandler,
     Lambda,
+    Code,
 )
 from .db import db, DbProxy
 from .object import BaseObject, proxify
@@ -127,13 +128,14 @@ class MRObject(BaseObject):
         """Return all soft-code commands, including those of a parent."""
         cmds = list(self.custom_cmds.values())
         if self.parent is not None:
-            cmds += self.parent.commands
+            cmds += [c.bind(self) for c in self.parent.commands]
         return cmds
 
     def dispatch(self, event, **kwargs):
         if event in self.event_handlers:
             # raise ActionFailed to interrupt
-            self.event_handlers[event](**kwargs)
+            handler = self.event_handlers[event].bind(self)
+            handler(**kwargs)
         if event in self.fw_event_handlers:
             handler = getattr(self, self.fw_event_handlers[event])
             handler(**kwargs)
@@ -196,10 +198,8 @@ class MRObject(BaseObject):
                 return [_copy(x) for x in item]
             if isinstance(item, dict):
                 return {k: _copy(v) for k, v in item.items()}
-            if getattr(item, "owner", None) == self:
-                item = copy.copy(item)
-                item.owner = obj
-                return item
+            if isinstance(item, Code):
+                return item.bind(obj)
             return item
 
         for attr, value in self.__dict__.items():
