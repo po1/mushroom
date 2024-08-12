@@ -170,15 +170,22 @@ class MRObject(BaseObject):
         self._checkfields()
 
     def exec_env(self):
+        import math
+        import random
+
         import mushroom
 
         return {
             "game": game,
             "db": DbProxy(db),
-            # "unsafe" useful stuff (nothing is really safe)
-            "world": mushroom.world,
             "util": mushroom.util,
-            "re": re,
+            "world": mushroom.world,
+            "mushroom": mushroom,
+
+            "itertools": itertools,
+            "math": math,
+            "random": random,
+            "time": time,
         }
 
     def clone(self):
