@@ -191,7 +191,7 @@ class EventHandler:
         txt = escape(self.code)
         return f"<event handler: {txt}>"
 
-    def run(self, caller=None, **kwargs):
+    def __call__(self, caller=None, **kwargs):
         caller = caller or self.owner
         exec_code(self.code, caller, owner=self.owner, **kwargs)
 

@@ -111,7 +111,7 @@ class MRObject(BaseObject):
     def dispatch(self, event, **kwargs):
         if event in self.custom_event_handlers:
             # raise ActionFailed to interrupt
-            self.custom_event_handlers[event].run(**kwargs)
+            self.custom_event_handlers[event](**kwargs)
         if event in self.fw_event_handlers:
             handler = getattr(self, self.fw_event_handlers[event])
             handler(**kwargs)
