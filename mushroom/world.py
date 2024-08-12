@@ -104,14 +104,36 @@ class MRObject(BaseObject):
         self.custom_event_handlers = {}
         self._initcmds()
         self.flags = []
+        self.parent = None
 
     def has_flag(self, flag):
+        """Return True if flag is set.
+        Note: there is no way to reset an inherited flag."""
+        if self.parent is not None and self.parent.has_flag(flag):
+            return True
         return flag in self.flags
 
+    @property
+    def event_handlers(self):
+        """Return all soft-code event handlers, including those of a parent."""
+        handlers = {}
+        if self.parent is not None:
+            handlers.update(self.parent.event_handlers)
+        handlers.update(self.custom_event_handlers)
+        return handlers
+
+    @property
+    def commands(self):
+        """Return all soft-code commands, including those of a parent."""
+        cmds = list(self.custom_cmds.values())
+        if self.parent is not None:
+            cmds += self.parent.commands
+        return cmds
+
     def dispatch(self, event, **kwargs):
-        if event in self.custom_event_handlers:
+        if event in self.event_handlers:
             # raise ActionFailed to interrupt
-            self.custom_event_handlers[event](**kwargs)
+            self.event_handlers[event](**kwargs)
         if event in self.fw_event_handlers:
             handler = getattr(self, self.fw_event_handlers[event])
             handler(**kwargs)
@@ -129,6 +151,13 @@ class MRObject(BaseObject):
 
     def __str__(self):
         return self.name
+
+    def __getattr__(self, attr):
+        if attr.startswith('_'):
+            return object.__getattribute__(self, attr)
+        if self.parent is None or not hasattr(self.parent, attr):
+            return object.__getattribute__(self, attr)
+        return getattr(self.parent, attr)
 
     def __getstate__(self):
         odict = dict(self.__dict__)
@@ -430,10 +459,14 @@ class MRPlayer(MRStuff):
 
     def has_flag(self, flag):
         powerflags = itertools.chain(*(p.flags for p in self.get_powers()))
-        return flag in self.flags or flag in powerflags
+        if flag in powerflags:
+            return True
+        return super().has_flag(flag)
 
     def get_powers(self):
         pows = list(self.powers)
+        if self.parent is not None and hasattr(self.parent, "get_powers"):
+            pows.extend(self.parent.get_powers())
         for thing in self.contents:
             if not util.is_thing(thing):
                 continue
@@ -443,7 +476,7 @@ class MRPlayer(MRStuff):
     @property
     def cmds(self):
         fw_cmds = list(self._fwcmds)
-        custom_cmds = list(self.custom_cmds.values())
+        custom_cmds = self.commands
         for p in self.get_powers():
             fw_cmds += p._fwcmds  # no custom commands on powers yet
 
@@ -454,14 +487,14 @@ class MRPlayer(MRStuff):
             for thing in container.contents:
                 if util.is_thing(thing):
                     fw_cmds.extend(onlyflag(flag, thing._fwcmds))
-                    custom_cmds.extend(onlyflag(flag, thing.custom_cmds.values()))
+                    custom_cmds.extend(onlyflag(flag, thing.commands))
 
         addthingcmds(self, "o")
         if self.location is not None:
             addthingcmds(self.location, "p")
             room_flag = "" if util.is_room(self.location) else "i"
             fw_cmds += onlyflag(room_flag, self.location._fwcmds)
-            custom_cmds += onlyflag(room_flag, self.location.custom_cmds.values())
+            custom_cmds += onlyflag(room_flag, self.location.commands)
 
         config = db.search(type=Config)[0]
         if (master_room := getattr(config, "master_room", None)) is not None:
@@ -685,7 +718,7 @@ class Engineer(Tinkerer):
     def cmd_delcmd(self, caller, obj, cmd):
         """delcmd <object> <cmd>: delete a command or match.
         <object> can be a # database ID."""
-        if cmd not in getattr(obj, "custom_cmds", {}):
+        if cmd not in obj.custom_cmds:
             raise ActionFailed(f"{obj} does not have command {cmd}")
         del obj.custom_cmds[cmd]
         caller.send(f"Deleted command '{cmd}' on {obj}")
