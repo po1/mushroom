@@ -610,7 +610,7 @@ class Examiner(MRPower):
         "examine": "cmd_examine",
     }
 
-    @regexp_command("examine", r"(#\d+|\w+)")
+    @regexp_command("examine", r"(#\d+|[^#].*)")
     def cmd_examine(self, caller, obj):
         """examine <object>: display commands and attributes of an object.
         <object> can be a # database ID."""
