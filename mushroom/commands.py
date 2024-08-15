@@ -94,7 +94,7 @@ class RegexpAction(Action, Updatable, Code):
         )
 
     def match(self, caller, query):
-        if (m := self.regexp.match(query)) is not None:
+        if (m := self.regexp.match(query, re.IGNORECASE)) is not None:
             exec_code(self.code, caller, owner=self.owner, groups=m.groups())
             return True
         return False
