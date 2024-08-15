@@ -1,0 +1,24 @@
+services:
+  mushroomd-dev:
+    image: python:3.9.19-alpine
+    command: sh -c "pip install -e . && while sleep 1000; do :; done"
+    working_dir: /workspace
+    volumes:
+      - data:/data
+      - .:/workspace
+  webproxy:
+    build: ./client
+    environment:
+      MUSHROOMD_HOST: "mushroomd-dev"
+      MUSHROOMD_PORT: "1337"
+    ports:
+      - "1338:1338"
+  client:
+    image: nginx:1.25.5
+    ports:
+      - "8000:80"
+    volumes:
+      - "${PWD}/client/static/index.html:/usr/share/nginx/html/index.html"
+
+volumes:
+  data:
