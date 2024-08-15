@@ -76,7 +76,7 @@ class Action:
 
 class RegexpAction(Action, Updatable, Code):
     def __init__(self, regexp, code, name=None, owner=None, flags=None):
-        self.regexp = re.compile(regexp)
+        self.regexp = re.compile(regexp, re.IGNORECASE)
         Code.__init__(self, code, owner)
         self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
@@ -87,6 +87,11 @@ class RegexpAction(Action, Updatable, Code):
     def _get_dummy(cls):
         return cls("dummy", None)
 
+    def __setstate__(self, odict):
+        if "regexp" in odict:
+            odict["regexp"] = re.compile(odict.pop("regexp").pattern, re.IGNORECASE)
+        super().__setstate__(odict)
+
     def __repr__(self) -> str:
         txt = escape(self.code)
         return (
@@ -94,7 +99,7 @@ class RegexpAction(Action, Updatable, Code):
         )
 
     def match(self, caller, query):
-        if (m := self.regexp.match(query, re.IGNORECASE)) is not None:
+        if (m := self.regexp.match(query)) is not None:
             exec_code(self.code, caller, owner=self.owner, groups=m.groups())
             return True
         return False
@@ -157,8 +162,8 @@ class CustomCommand(BaseCommand, Updatable, Code):
         return cls(None, None, None)
 
     def __setstate__(self, odict):
-        if 'txt' in odict:
-            odict['code'] = odict.pop('txt')
+        if "txt" in odict:
+            odict["code"] = odict.pop("txt")
         super().__setstate__(odict)
 
     def __repr__(self):

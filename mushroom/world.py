@@ -155,7 +155,7 @@ class MRObject(BaseObject):
         return self.name
 
     def __getattr__(self, attr):
-        if attr.startswith('_'):
+        if attr.startswith("_"):
             return object.__getattribute__(self, attr)
         if self.parent is None or not hasattr(self.parent, attr):
             return object.__getattribute__(self, attr)
@@ -183,7 +183,6 @@ class MRObject(BaseObject):
             "util": mushroom.util,
             "world": mushroom.world,
             "mushroom": mushroom,
-
             "itertools": itertools,
             "math": math,
             "random": random,
