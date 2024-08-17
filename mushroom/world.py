@@ -589,9 +589,10 @@ class MRPower:
         return f"<power {self.name}>"
 
     def __setstate__(self, odict):
+        if not "name" in odict:
+            odict["name"] = self.__class__.__name__
+        self.__dict__.update(odict)
         self.initcommands()
-        if not hasattr(self, "name"):
-            self.name = self.__class__.__name__
 
     def __getstate__(self):
         odict = dict(self.__dict__)
