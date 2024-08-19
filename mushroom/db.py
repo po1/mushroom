@@ -35,6 +35,7 @@ class Database:
             self.objects[self.last_id] = obj
             self.ids[obj] = self.last_id
             self.last_id += 1
+        return obj
 
     def remove(self, obj):
         with self.lock.w:

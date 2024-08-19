@@ -3,6 +3,7 @@ import random
 import re
 import threading
 
+from mushroom.cipher import cipher, decipher
 from mushroom import template
 from .register import get_type
 
