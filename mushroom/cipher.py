@@ -24,6 +24,8 @@ def _amxor(c, k, letters):
 
 
 def cipher(text, key, xor=_mxor):
+    if len(key) == 0:
+        return text
     out = io.StringIO()
     for i, c in enumerate(text):
         if c.lower() not in string.ascii_lowercase:
