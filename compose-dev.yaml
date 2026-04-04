@@ -19,6 +19,17 @@ services:
       - "8000:80"
     volumes:
       - "${PWD}/client/static/index.html:/usr/share/nginx/html/index.html"
+  code:
+    image: codercom/code-server
+    volumes:
+      - "${PWD}:/home/coder/project"
+      - "${HOME}/.gitconfig:/home/coder/.gitconfig"
+    user: ${UID}:${GID}
+    environment:
+      DOCKER_USER: ${USER}
+    ports:
+      - "127.0.0.1:9000:8080"
+    command: ["project"]
 
 volumes:
   data:

@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import importlib
 import logging
 import socket
@@ -11,9 +12,10 @@ from typing import Any
 
 import tomli
 
-from .client import Client
-from .config import Config
-import mushroom.portal
+from mushroom.client import Client
+from mushroom.game import Game
+from mushroom.config import Config
+from mushroom.portal import Server as PortalServer
 
 
 class LogFile:
@@ -39,14 +41,18 @@ class ClientRegister:
         for c in self.clients:
             c.send(msg)
 
+    def find_client(self, handler):
+        for client in self.clients:
+            if client.handler is handler:
+                return client
+        raise RuntimeError("Could not find a client for handler")
+
     def broadcast_except(self, client, msg):
+        if isinstance(client, ClientHandler):
+            client = self.find_client(handler=client)
         for c in self.clients:
             if c is not client:
                 c.send(msg)
-
-    def shutdown(self):
-        for c in self.clients:
-            c.handler.request.shutdown(socket.SHUT_WR)
 
     def get_uid(self):
         self.lastid += 1
@@ -67,17 +73,31 @@ class ClientRegister:
         self.clients.remove(client)
 
 
-class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
-    """
-    Basic handler for TCP input
-    Interfaces with the FW client class
-    Also handles the operator commands,
-    which are FW-independant
-    """
+class ClientHandler():
+    def __init__(self, server, writer):
+        self.server = server
+        self.writer = writer
+        self.name = writer.get_extra_info('peername')
+        self.silent = False
+        self.op = False
 
+    def broadcast(self, msg):
+        self.server.broadcast(msg)
+
+    def broadcast_others(self, msg):
+        self.server.broadcast_except(self, msg)
+
+    def send(self, msg):
+        self.writer.write(msg.encode("utf8"))
+        asyncio.create_task(self.writer.drain())
+
+    def shutdown(self):
+        asyncio.create_task(self.writer.close())
+
+
+class ServerCommandHandler:
     scmds = {
         "help": "scmd_help",
-        "reload": "scmd_reload",
         "login": "scmd_login",
         "users": "scmd_users",
         "kick": "scmd_kick",
@@ -85,54 +105,15 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         "shutdown": "scmd_shutdown",
         "load": "scmd_load",
     }
-    op_scmds = ["users", "kick", "save", "load", "shutdown", "reload"]
+    op_scmds = ["users", "kick", "save", "load", "shutdown"]
 
-    def handler_write(self, msg):
-        self.wfile.write(msg.encode("utf8"))
-
-    def broadcast(self, msg):
-        self.server.cr.broadcast(msg)
-
-    def broadcast_others(self, msg):
-        self.server.cr.broadcast_except(self.cl, msg)
-
-    def handle(self):
-        ip = self.request.getpeername()[0]
-        self.cl = Client(self, ip)
-        self.server.cr.add(self.cl)
-        self.silent = False
+    def __init__(self, server, client):
+        self.server = server
+        self.client = client
         self.op = False
 
-        logging.info(f"New client: {ip}")
-        try:
-            with open(self.server.cfg.motd_file, "r") as f:
-                self.handler_write(f.read())
-        except OSError:
-            self.handler_write("Welcome!\n")
-        for data in self.rfile:
-            try:
-                data = data.decode("utf8")
-                with self.server.dirty_lock:
-                    self.server.dirty = True
-                if self.server.cfg.debug:
-                    self.server.log(f"data from {self.cl.name}: {repr(data)}")
-                if not self.handle_scommands(data):
-                    self.cl.handle_input(data)
-            except Exception as e:
-                traceback.print_exc()
-                if self.server.cfg.debug:
-                    self.handler_write(f"{repr(e)}")
-                    continue
-                self.handler_write("An error occured. Please reconnect...\n")
-                break
-        logging.info(f"Client disconnected: {ip}")
-        self.cl.on_disconnect()
-        self.server.cr.delete(self.cl)
-        if not self.silent:
-            self.server.cr.broadcast(self.cl.name + " has quit.")
-
-    def handle_scommands(self, data):
-        op_command_prefix = self.server.cfg.op_command_prefix
+    def handle_input(self, data):
+        op_command_prefix = self.server.config.op_command_prefix
         words = data.split()
         if len(words) < 1:
             return True  # no need to parse that further
@@ -146,68 +127,54 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         return getattr(self, self.scmds[cmd])(" ".join(words[1:]))
 
     def scmd_help(self, rest):
-        self.handler_write("List of available server commands:\n")
+        self.client.send("List of available server commands:\n")
         cmds = list(self.scmds.keys())
         if not self.op:
             cmds = [x for x in cmds if x not in self.op_scmds]
-        self.handler_write("  {}\n".format(", ".join(cmds)))
+        self.client.send("  {}\n".format(", ".join(cmds)))
         return True
 
     def scmd_login(self, rest):
-        if rest == self.server.cfg.op_password:
+        if rest == self.server.config.op_password:
             self.op = True
-            self.handler_write("Successflly logged as operator\n")
-            return True
-        return False
-
-    def scmd_reload(self, rest):
-        if rest:
-            try:
-                self.scmd_save("")
-                importlib.reload(sys.modules[rest])
-                self.scmd_load("")
-                for client in self.server.cr.clients:
-                    client.reload()
-                self.handler_write("Done!\n")
-            except Exception as e:
-                self.handler_write(f"woops: {e}")
+            self.client.send("Successflly logged as operator\n")
             return True
         return False
 
     def scmd_shutdown(self, rest):
-        logging.info(f"Shutdown request by {self.cl.name}")
-        self.handler_write("Shutting down\n")
+        logging.info(f"Shutdown request by {self.client.name}")
+        self.client.send("Shutting down\n")
         self.server.running = False
         return True
 
     def scmd_users(self, rest):
-        self.handler_write("Users listing:\n")
-        for c in self.server.cr.clients:
-            cid = self.server.cr.idmap[c]
+        self.client.send("Users listing:\n")
+        for c in self.server.client_register.clients:
+            cid = self.server.client_register.idmap[c]
             try:
-                self.handler_write(
+                self.client.send(
                     "{}\t{}\t{}\n".format(
                         cid, c.name, c.handler.request.getpeername()[0]
                     )
                 )
             except socket.error:
                 traceback.print_exc()
-                self.handler_write("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
+                self.client.send("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
         return True
 
     def scmd_save(self, rest):
         self.server.save_db()
-        self.handler_write("Database saved\n")
+        self.client.send("Database saved\n")
         return True
 
     def scmd_load(self, rest):
         try:
-            self.server.db.load(self.server.cfg.db_file)
-            self.handler_write("Database loaded\n")
+            self.server.db.load(self.server.config.db_file)
+            self.client.send("Database loaded\n")
         except IOError:
-            self.handler_write("Could not load: database not found.\n")
+            self.client.send("Could not load: database not found.\n")
         except Exception:
-            self.handler_write("Load failed. Check server log.\n")
+            self.client.send("Load failed. Check server log.\n")
             traceback.print_exc()
         return True
 
@@ -215,16 +182,16 @@ class ThreadedTCPRequestHandler(socketserver.StreamRequestHandler):
         try:
             cid = int(rest)
         except ValueError:
-            self.handler_write("Error: not a valid id\n")
+            self.client.send("Error: not a valid id\n")
         else:
-            clnt = self.server.cr.get_client(cid)
+            clnt = self.server.client_register.get_client(cid)
             if clnt is not None:
-                clnt.handler.handler_write("You have been kicked! (ouch...)\n")
+                clnt.send("You have been kicked! (ouch...)\n")
                 clnt.handler.silent = True
-                clnt.handler.request.shutdown(socket.SHUT_RD)
-                self.server.cr.broadcast_except(clnt, clnt.name + " has been kicked!")
+                clnt.handler.shutdown()
+                self.server.broadcast_except(clnt, clnt.name + " has been kicked!")
             else:
-                self.handler_write("Error: not a valid id\n")
+                self.client.send("Error: not a valid id\n")
         return True
 
 
@@ -233,64 +200,87 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 
 class Server:
-    def __init__(self, config, db):
+    def __init__(self, config, game):
         self.config = config
-        self.db = db
-        self.start()
+        self.game = game
+        self.client_register = ClientRegister()
+        self.log = LogFile(self.config.log_file)
+        self.dirty = False
+        self.running = False
 
-    def start(self):
-        HOST = self.config.listen_address
-        PORT = self.config.listen_port
-
-        self.server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
-
-        # Start a thread with the server -- that thread will then start one
-        # more thread for each request
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        # Exit the server thread when the main thread terminates
-        self.server_thread.daemon = True
-        self.server.running = True
-        self.server.cr = ClientRegister()
-        self.server.log = LogFile(self.config.log_file)
-        self.server.db = self.db
-        self.server.cfg = self.config
-        self.server.dirty = False
-        self.server.dirty_lock = threading.Lock()
-        self.server.save_db = self.save_db
-
-        self.autosave_thread = threading.Thread(target=self.autosave, daemon=True)
-        self.server_thread.start()
-        self.autosave_thread.start()
-
+    async def start(self):
+        self.running = True
+        self.server = await asyncio.start_server(self._on_client_connect, self.config.listen_address, self.config.listen_port)
         logging.info("Server started and ready to accept connections.")
+
+    def greet_client(self, client):
+        try:
+            with open(self.config.motd_file, "r") as f:
+                client.send(f.read())
+        except OSError:
+            client.send("Welcome!\n")
+
+    async def _on_client_connect(self, reader, writer):
+        handler = ClientHandler(self, writer)
+        client = Client(handler, handler.name, self.game)
+        scommand_handler = ServerCommandHandler(self, client)
+        self.client_register.add(client)
+
+        logging.info(f"New client: {client.name}")
+        self.greet_client(client)
+
+        while self.running:
+            data = await reader.readline()
+            if not data:
+                break
+            self.dirty = True
+            try:
+                data = data.decode("utf8")
+                self.dirty = True
+                if self.config.debug:
+                    self.log(f"data from {client.name}: {repr(data)}")
+                if not scommand_handler.handle_input(data):
+                    client.handle_input(data)
+            except Exception as e:
+                traceback.print_exc()
+                if self.config.debug:
+                    client.send(f"{repr(e)}\n")
+                    continue
+                client.send("An error occured. Please reconnect...\n")
+                break
+
+        logging.info(f"Client disconnected: {client.name}")
+        client.on_disconnect()
+        client.handler.shutdown()
+        self.client_register.delete(self.cl)
+        if not self.silent:
+            self.client_register.broadcast(client.name + " has quit.")
 
     def save_db(self):
         logging.info("Saving database.")
-        self.db.dump(self.config.db_file)
+        self.game.dump_db(self.config.db_file)
 
-    def autosave(self):
-        while True:
-            time.sleep(self.config.autosave_period)
-            with self.server.dirty_lock:
-                dirty = self.server.dirty
-                self.server.dirty = False
-            if not dirty:
+    async def autosave(self):
+        while self.running:
+            await asyncio.sleep(self.config.autosave_period)
+            if not server.dirty:
                 continue
             self.save_db()
-            if self.server_thread.is_alive():
-                self.server.cr.broadcast("Saving the world...")
+            self.server.cr.broadcast("Saving the world...")
 
-    def serve_forever(self):
-        # Wait for a user shutdown
+    def broadcast(self, msg):
+        self.client_register.broadcast(msg)
+
+    def broadcast_except(self, client, msg):
+        self.client_register.broadcast_except(client, msg)
+
+    async def serve_forever(self):
+        asyncio.create_task(self.autosave())
         try:
-            while self.server.running:
-                self.server_thread.join(1)
-        except KeyboardInterrupt:
-            logging.info("Got SIGINT, closing the server...")
-        self.server.cr.broadcast("Shutting down...")
-        self.server.cr.shutdown()
-        self.server.shutdown()
-        self.save_db()
+            await self.server.serve_forever()
+        finally:
+            self.client_register.broadcast("Shutting down...")
+            self.save_db()
 
 
 def parse_args():
@@ -300,33 +290,45 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+async def amain():
     logging.basicConfig(level=logging.INFO)
 
-    from .db import db as global_db
-
-    db = global_db  # XXX: switch to a non-local DB eventually
+    game = Game()
 
     args = parse_args()
     cfg_override = {}
     if args.config is not None:
         with open(args.config, "rb") as file:
             cfg_override = tomli.load(file)
-    cfg = Config(**cfg_override)
+    config = Config(**cfg_override)
+
     try:
-        db.load(cfg.db_file)
+        game.load_db(config.db_file)
         logging.info("Database successfully loaded.")
     except IOError:
         logging.info("Database not found, starting fresh.")
 
-    logging.info(f"Starting portal server")
-    portal_server = mushroom.portal.Server()
-    portal_server.start()
+    if config.portal_enabled:
+        logging.info(f"Starting portal server")
+        portal_server = PortalServer(ip=config.portal_ip, port=config.portal_port)
+        await portal_server.start()
 
-    logging.info(f"Starting server on {cfg.listen_address}:{cfg.listen_port}")
-    server = Server(cfg, db)
-    server.serve_forever()
+    logging.info(f"Starting server on {config.listen_address}:{config.listen_port}")
+    server = Server(config, game)
+    await server.start()
+    
+    try:
+        await server.serve_forever()
+    except asyncio.CancelledError:
+        logging.info("Got SIGINT, closing the server...")
+
+
+def main():
+    try:
+        asyncio.run(amain())
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(amain())

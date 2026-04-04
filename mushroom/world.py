@@ -1,6 +1,7 @@
 import bisect
 from collections.abc import Iterable
 import copy
+from functools import cached_property
 import queue
 import itertools
 import logging
@@ -21,74 +22,13 @@ from .commands import (
 from .db import db, DbProxy
 from .object import BaseObject, proxify
 from .register import register
-from .util import regexp_command
+from .util import regexp_command, serialize, Serializable
 
 logger = logging.getLogger(__name__)
 
 
-class Game:
-    def __init__(self) -> None:
-        self._timers = []  # ordered by increasing expiration time
-        self._event_queue = queue.SimpleQueue()
-        self._loop_thread = threading.Thread(target=self._loop)
-        self._loop_thread.daemon = True
-        self._loop_thread.start()
-
-    def __reduce__(self):
-        return "game"  # name of the global instance for pickling
-
-    def __dir__(self) -> Iterable[str]:
-        return [
-            x
-            for x in list(self.__dict__) + list(self.__class__.__dict__)
-            if not x.startswith("_")
-        ]
-
-    def schedule(self, when, event):
-        """Schedules an event to happen in <when> seconds."""
-        bisect.insort(self._timers, (time.time() + when, event))
-        self._event_queue.put(None)  # wake up
-
-    def _next_timeout(self):
-        # wake up the thread every second, just, you know, for fun.
-        if not self._timers:
-            return 1.0
-        return min(self._timers[0][0] - time.time(), 1.0)
-
-    def _loop(self):
-        while True:
-            try:
-                event = self._event_queue.get(timeout=self._next_timeout())
-            except queue.Empty:
-                pass
-            else:
-                self._run_event(event)
-
-            self._handle_timers()
-
-    def _run_event(self, event):
-        if event is not None:
-            try:
-                event()  # self-dispatching events are tight
-            except Exception as e:
-                logging.warning(
-                    "exception in event callback: %s", repr(event), exc_info=e
-                )
-
-    def _handle_timers(self):
-        now = time.time()
-        while self._timers:
-            when, evt = self._timers[0]
-            if when > now:
-                return
-            del self._timers[0]
-            self._run_event(evt)
-
-
-game = Game()
-
-
-class MRObject(BaseObject):
+@register
+class MRObject(BaseObject, Serializable):
     """
     Base database object.
     """
@@ -103,7 +43,6 @@ class MRObject(BaseObject):
         self.description = self.default_description
         self.custom_cmds = {}
         self.custom_event_handlers = {}
-        self._initcmds()
         self.flags = []
         self.parent = None
 
@@ -120,13 +59,13 @@ class MRObject(BaseObject):
         handlers = {}
         if self.parent is not None:
             handlers.update(self.parent.event_handlers)
-        handlers.update(self.custom_event_handlers)
+        handlers.update({e: h.bind(self) for e, h in self.custom_event_handlers.items()})
         return handlers
 
     @property
     def commands(self):
         """Return all soft-code commands, including those of a parent."""
-        cmds = list(self.custom_cmds.values())
+        cmds = [c.bind(self) for c in self.custom_cmds.values()]
         if self.parent is not None:
             cmds += [c.bind(self) for c in self.parent.commands]
         return cmds
@@ -140,8 +79,9 @@ class MRObject(BaseObject):
             handler = getattr(self, self.fw_event_handlers[event])
             handler(**kwargs)
 
-    def _initcmds(self):
-        self._fwcmds = [
+    @cached_property
+    def _fwcmds(self):
+        return [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
         ]
 
@@ -162,32 +102,11 @@ class MRObject(BaseObject):
         return getattr(self.parent, attr)
 
     def __getstate__(self):
-        odict = dict(self.__dict__)
-        del odict["_fwcmds"]
-        return odict
+        return dict(self.__dict__)
 
     def __setstate__(self, odict):
         self.__dict__.update(odict)
-        self._initcmds()
-        self._checkfields()
-
-    def exec_env(self):
-        import math
-        import random
-
-        import mushroom
-
-        return {
-            "game": game,
-            "db": DbProxy(db),
-            "util": mushroom.util,
-            "world": mushroom.world,
-            "mushroom": mushroom,
-            "itertools": itertools,
-            "math": math,
-            "random": random,
-            "time": time,
-        }
+        self._add_missing_fields()
 
     def clone(self):
         obj = self.__class__(self.name)
@@ -207,14 +126,13 @@ class MRObject(BaseObject):
             if attr == "contents":
                 obj.contents = []
             setattr(obj, attr, _copy(value))
-        obj._initcmds()
         return obj
 
     @classmethod
     def _get_dummy(cls):
         return cls(None)
 
-    def _checkfields(self):
+    def _add_missing_fields(self):
         dummy = self._get_dummy()
         for d in dummy.__dict__:
             if d not in self.__dict__:
@@ -442,7 +360,7 @@ class MRPlayer(MRStuff):
     default_description = "A non-descript citizen."
 
     def __init__(self, name):
-        self.client = None
+        self._client = None
         self.powers = []
         super().__init__(name)
 
@@ -456,12 +374,12 @@ class MRPlayer(MRStuff):
 
     def __getstate__(self):
         odict = super().__getstate__()
-        del odict["client"]
+        del odict["_client"]
         return odict
 
     def __setstate__(self, odict):
         super().__setstate__(odict)
-        self.client = None
+        self._client = None
 
     def has_flag(self, flag):
         powerflags = itertools.chain(*(p.flags for p in self.get_powers()))
@@ -531,8 +449,8 @@ class MRPlayer(MRStuff):
         util.moveto(object, destination)
 
     def send(self, msg):
-        if self.client is not None:
-            self.client.send(msg)
+        if self._client is not None:
+            self._client.send(msg)
 
     def reachable_objects(self):
         objs = list(self.contents)
@@ -574,12 +492,11 @@ class MRPlayer(MRStuff):
         self.cmd_look(self, "here")
 
 
-class MRPower:
+class MRPower(Serializable):
     fw_cmds = {}
     flags = []
 
     def __init__(self, name=None):
-        self.initcommands()
         self.name = name or self.__class__.__name__
 
     def __dir__(self):
@@ -588,19 +505,17 @@ class MRPower:
     def __repr__(self):
         return f"<power {self.name}>"
 
+    def __getstate__(self):
+        odict = {k: getattr(self, k) for k in dir(self)}
+
     def __setstate__(self, odict):
         if not "name" in odict:
             odict["name"] = self.__class__.__name__
         self.__dict__.update(odict)
-        self.initcommands()
 
-    def __getstate__(self):
-        odict = dict(self.__dict__)
-        del odict["_fwcmds"]
-        return odict
-
-    def initcommands(self):
-        self._fwcmds = [
+    @cached_property
+    def _fwcmds(self):
+        return [
             WrapperCommand(k, getattr(self, v)) for k, v in self.fw_cmds.items()
         ]
 
@@ -633,7 +548,7 @@ class Tinkerer(Examiner):
         <value> can be a # database ID, otherwise it is a string."""
         value = db.dbref(value) or value
         if lbd is not None:
-            value = Lambda(value, obj)
+            value = Lambda(value).bind(obj)
         setattr(obj, attr, value)
         caller.send(f"Set attribute '{attr}' on {obj}")
 
@@ -735,7 +650,7 @@ class Engineer(Tinkerer):
         """setevent <object> <event> <code>: set an event handler on an object.
         <object> can be a # database ID."""
         code = util.unescape(code)
-        obj.custom_event_handlers[event] = EventHandler(code, owner=obj)
+        obj.custom_event_handlers[event] = EventHandler(code)
         caller.send(f"Set event handler '{event}' on {obj}")
 
     @regexp_command("delevent", r"(#\d+|\w+) ([^ ]+)")

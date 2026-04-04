@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 import logging
 import re
+import types
 
 from .object import proxify
-from .util import ActionFailed, Updatable, escape
+from .util import ActionFailed, Updatable, escape, serialize, Serializable
 
 logger = logging.getLogger(__name__)
 DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
@@ -39,25 +40,47 @@ def eval_code(code, caller, owner=None, **kwargs):
         caller.send(f"eval error: ({e.__class__.__name__}) {e}")
 
 
-class Code:
-    fancy_name = "code"
-
-    def __init__(self, code, owner=None):
+class BoundCode:
+    def __init__(self, code, owner):
         self.code = code
         self.owner = owner
 
+    def __getattr__(self, attr):
+        if 'code' not in self.__dict__:
+            raise AttributeError()
+        child_attr = getattr(self.code, attr)
+        if type(child_attr) is types.MethodType:
+            child_attr = child_attr.__func__.__get__(self)
+        return child_attr
+
+    def __repr__(self):
+        return repr(self.code)
+
+    def run(self, caller=None, **kwargs):
+        return self.code.run(owner=self.owner, caller=caller, **kwargs)
+
+    __call__ = run
+
+
+class Code(Serializable):
+    fancy_name = "code"
+
+    def __init__(self, code):
+        self.code = code
+
     def bind(self, owner):
-        obj = copy.copy(self)
-        obj.owner = owner
-        return obj
+        return BoundCode(self, owner)
 
     def __repr__(self):
         txt = escape(self.code)
         return f"<{self.fancy_name}: {txt}>"
 
-    def __call__(self, caller=None, **kwargs):
-        caller = caller or self.owner
-        exec_code(self.code, caller, owner=self.owner, **kwargs)
+    def __dir__(self):
+        return [k for k in self.__dict__ if not k.startswith("_")]
+
+    def run(self, owner, caller=None, **kwargs):
+        caller = caller or owner
+        exec_code(self.code, caller, owner=owner, **kwargs)
 
 
 class Caller:
@@ -77,7 +100,7 @@ class Action:
 class RegexpAction(Action, Updatable, Code):
     def __init__(self, regexp, code, name=None, owner=None, flags=None):
         self.regexp = re.compile(regexp, re.IGNORECASE)
-        Code.__init__(self, code, owner)
+        Code.__init__(self, code)
         self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
         self.flags = flags or DEFAULT_FLAGS
@@ -122,7 +145,7 @@ class BaseCommand(Action):
         if command.lower() != self.name:
             return False
 
-        self.run(caller, args)
+        self.run(caller, query=args)
         return True
 
 
@@ -151,9 +174,9 @@ class CustomCommand(BaseCommand, Updatable, Code):
 
     help_text = "No help available"
 
-    def __init__(self, name, code, owner, flags=None):
+    def __init__(self, name, code, flags=None):
         self.name = name
-        Code.__init__(self, code, owner)
+        Code.__init__(self, code)
         self.flags = flags or DEFAULT_FLAGS
 
     # for Updatable
@@ -169,9 +192,6 @@ class CustomCommand(BaseCommand, Updatable, Code):
     def __repr__(self):
         txt = escape(self.code)
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
-
-    def run(self, caller, query):
-        exec_code(self.code, caller, owner=self.owner, query=query)
 
 
 class Answer(Action):
@@ -217,6 +237,6 @@ class Lambda(Code):
     def __repr__(self):
         return f"<lambda: {self.code}>"
 
-    def __call__(self, caller=None, **kwargs):
-        caller = caller or self.owner
-        return eval_code(self.code, caller, owner=self.owner, **kwargs)
+    def run(self, owner, caller=None, **kwargs):
+        caller = caller or owner
+        return eval_code(self.code, caller, owner=owner, **kwargs)

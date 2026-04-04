@@ -20,3 +20,7 @@ class Config:
     log_file: str = "server.log"
 
     autosave_period: int = 300
+
+    portal_ip: str = "0.0.0.0"
+    portal_port: int = 1339
+    portal_enabled: bool = False

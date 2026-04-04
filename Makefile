@@ -1,9 +1,11 @@
 UID := $(shell id -u)
 GID := $(shell id -g)
+export UID GID
 
 .PHONY: dev
 dev:            ## Launch a dev container. Just type 'mushroomd' in it.
 	docker compose -f compose-dev.yaml up -d \
+		&& docker exec mushroom-code-1 cat /home/coder/.config/code-server/config.yaml \
 		&& docker exec -it --user "$(UID):$(GID)" mushroom-mushroomd-dev-1 sh
 
 .PHONY: help
