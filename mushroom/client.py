@@ -1,11 +1,9 @@
 import logging
 import time
 
-from . import util
-from .db import db
-from .register import get_type
-from .commands import BaseCommand, ActionFailed
-from .commands import add_answer_to, YesNoAnswer
+from mushroom import util
+from mushroom.commands import BaseCommand, ActionFailed
+from mushroom.commands import add_answer_to, YesNoAnswer
 
 
 class PlayCommand(BaseCommand):
@@ -18,16 +16,15 @@ class PlayCommand(BaseCommand):
 
     def create_character(self, caller, name):
         caller.add_cmd(self)
-        char = get_type("player")(name)
-        db.add(char)
+        char = caller.game.make_player(name, self)
         self.play(caller, char)
 
     def play(self, caller, char):
-        if char.client is not None:
+        if char._client is not None:
             caller.send(f"{char.name} is already online.")
             return
         caller.player = char
-        char.client = caller
+        char.play(caller, caller.game)
         caller.remove_cmd(self)
         caller.name = char.name
         caller.send("You are now playing as {}".format(char.name))
@@ -39,11 +36,9 @@ class PlayCommand(BaseCommand):
             caller.send("Play who?")
             return
 
-        matchs = util.match_list(query, db.list_all(get_type("player")))
+        matchs = util.match_list(query, caller.game.get_players())
         if not matchs:
-            caller.send(
-                "Couldn't find a character named {}.\n" "Create it?".format(query)
-            )
+            caller.send(f"Couldn't find a character named {query}.\nCreate it?")
             caller.remove_cmd(self)
             add_answer_to(
                 YesNoAnswer(
@@ -61,7 +56,7 @@ class HelpCommand(BaseCommand):
     help_text = "syntax: help <command>\n" "Displays help topics for the given command."
 
     def run(self, caller, query):
-        caller = getattr(caller, "client", caller)
+        caller = getattr(caller, "_client", caller)
         commands = [x for x in caller.available_cmds() if hasattr(x, "name")]
         if query is None:
             visible_commands = [x.name for x in commands]
@@ -84,17 +79,18 @@ class Client:
         PlayCommand,
     ]
 
-    def __init__(self, handler, name):
+    def __init__(self, handler, name, game):
         self.handler = handler
         self.name = name
+        self.game = game
         self.player = None
         self.cmds = [c() for c in self.fw_cmds]
 
     def reload(self):
         if self.player is None:
             return
-        self.player = db.get(self.player.id)
-        self.player.client = self
+        self.player = self.game.db.get(self.player.id)
+        self.player._client = self
 
     def add_cmd(self, command):
         self.cmds.append(command)
@@ -104,7 +100,7 @@ class Client:
 
     def send(self, msg):
         try:
-            self.handler.handler_write((msg + "\n"))
+            self.handler.send(msg + "\n")
         except IOError:
             logging.error(f"Could not send to {self.name}")
 
@@ -140,5 +136,5 @@ class Client:
 
     def on_disconnect(self):
         if self.player is not None:
-            self.player.client = None
+            self.player._client = None
             self.player.dispatch("disconnect")

@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 import logging
 import re
+import types
 
-from .object import proxify
-from .util import ActionFailed, Updatable, escape
+from mushroom.db import proxify
+from mushroom.util import ActionFailed, escape
 
 logger = logging.getLogger(__name__)
 DEFAULT_FLAGS = "o"  # (o)wner (p)eer (i)nterior
@@ -39,25 +40,50 @@ def eval_code(code, caller, owner=None, **kwargs):
         caller.send(f"eval error: ({e.__class__.__name__}) {e}")
 
 
-class Code:
-    fancy_name = "code"
-
-    def __init__(self, code, owner=None):
+class BoundCode:
+    def __init__(self, code, owner):
         self.code = code
         self.owner = owner
 
+    def __repr__(self):
+        return repr(self.code).replace("<", "<bound ")
+
+    def __getattr__(self, attr):
+        if "code" not in self.__dict__:
+            raise AttributeError()
+        child_attr = getattr(self.code, attr)
+        if type(child_attr) is types.MethodType:
+            child_attr = child_attr.__func__.__get__(self)
+        return child_attr
+
     def bind(self, owner):
-        obj = copy.copy(self)
-        obj.owner = owner
-        return obj
+        return self.code.bind(owner)
+
+    def run(self, caller=None, **kwargs):
+        return self.code.run(self.owner, caller=caller, **kwargs)
+
+    __call__ = run
+
+
+class Code:
+    fancy_name = "code"
+
+    def __init__(self, code):
+        self.code = code
+
+    def bind(self, owner):
+        return BoundCode(self, owner)
 
     def __repr__(self):
         txt = escape(self.code)
         return f"<{self.fancy_name}: {txt}>"
 
-    def __call__(self, caller=None, **kwargs):
-        caller = caller or self.owner
-        exec_code(self.code, caller, owner=self.owner, **kwargs)
+    def __dir__(self):
+        return [k for k in self.__dict__ if not k.startswith("_")]
+
+    def run(self, owner, caller=None, **kwargs):
+        caller = caller or owner
+        exec_code(self.code, caller, owner=owner, **kwargs)
 
 
 class Caller:
@@ -74,23 +100,13 @@ class Action:
         return False
 
 
-class RegexpAction(Action, Updatable, Code):
-    def __init__(self, regexp, code, name=None, owner=None, flags=None):
+class RegexpAction(Action, Code):
+    def __init__(self, regexp, code, name=None, flags=None):
         self.regexp = re.compile(regexp, re.IGNORECASE)
-        Code.__init__(self, code, owner)
+        Code.__init__(self, code)
         self.name = name or re.match(r"\w+", regexp).group()
         self.help_text = regexp
         self.flags = flags or DEFAULT_FLAGS
-
-    # for Updatable
-    @classmethod
-    def _get_dummy(cls):
-        return cls("dummy", None)
-
-    def __setstate__(self, odict):
-        if "regexp" in odict:
-            odict["regexp"] = re.compile(odict.pop("regexp").pattern, re.IGNORECASE)
-        super().__setstate__(odict)
 
     def __repr__(self) -> str:
         txt = escape(self.code)
@@ -100,7 +116,7 @@ class RegexpAction(Action, Updatable, Code):
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
-            exec_code(self.code, caller, owner=self.owner, groups=m.groups())
+            self.run(caller, groups=m.groups())
             return True
         return False
 
@@ -122,8 +138,11 @@ class BaseCommand(Action):
         if command.lower() != self.name:
             return False
 
-        self.run(caller, args)
+        self.run(caller, query=args)
         return True
+
+    def run(self, caller, query):
+        raise NotImplementedError("Subclasses must implement run")
 
 
 class WrapperCommand(BaseCommand):
@@ -138,40 +157,26 @@ class WrapperCommand(BaseCommand):
         self.help_text = func.__doc__ or self.help_text
         self.flags = flags or DEFAULT_FLAGS
 
-    def __repr__(self):
-        return f"<built-in command {self.name}>"
-
     def run(self, caller, query):
         if self.func:
             self.func(caller, query)
 
 
-class CustomCommand(BaseCommand, Updatable, Code):
+class CustomCommand(BaseCommand, Code):
     """For user-supplied scripts."""
 
     help_text = "No help available"
 
-    def __init__(self, name, code, owner, flags=None):
+    def __init__(self, name, code, flags=None):
         self.name = name
-        Code.__init__(self, code, owner)
+        Code.__init__(self, code)
         self.flags = flags or DEFAULT_FLAGS
-
-    # for Updatable
-    @classmethod
-    def _get_dummy(cls):
-        return cls(None, None, None)
-
-    def __setstate__(self, odict):
-        if "txt" in odict:
-            odict["code"] = odict.pop("txt")
-        super().__setstate__(odict)
 
     def __repr__(self):
         txt = escape(self.code)
         return f"<cmd {self.name}[{self.flags}]: {txt}>"
 
-    def run(self, caller, query):
-        exec_code(self.code, caller, owner=self.owner, query=query)
+    run = Code.run
 
 
 class Answer(Action):
@@ -217,6 +222,6 @@ class Lambda(Code):
     def __repr__(self):
         return f"<lambda: {self.code}>"
 
-    def __call__(self, caller=None, **kwargs):
-        caller = caller or self.owner
-        return eval_code(self.code, caller, owner=self.owner, **kwargs)
+    def run(self, owner, caller=None, **kwargs):
+        caller = caller or owner
+        return eval_code(self.code, caller, owner=owner, **kwargs)

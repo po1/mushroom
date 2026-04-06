@@ -1,5 +1,6 @@
 UID := $(shell id -u)
 GID := $(shell id -g)
+export UID GID
 
 .PHONY: dev
 dev:            ## Launch a dev container. Just type 'mushroomd' in it.
