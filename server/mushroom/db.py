@@ -58,6 +58,11 @@ class Database:
                 del self._ids[obj]
 
     def get(self, obj_id):
+        if isinstance(obj_id, str) and obj_id.startswith("#"):
+            try:
+                obj_id = int(obj_id[1:])
+            except ValueError:
+                return None
         with self._lock.r:
             return self._objects.get(obj_id, None)
 

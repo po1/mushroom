@@ -1,3 +1,4 @@
+import logging
 import re
 from functools import cached_property
 
@@ -16,6 +17,8 @@ from mushroom.game import Game
 from mushroom.util import ActionFailed, regexp_command
 from mushroom.world.objects import Thing
 from mushroom.world.room import Room
+
+logger = logging.getLogger(__name__)
 
 
 class Power:
