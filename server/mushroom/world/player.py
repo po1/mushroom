@@ -2,11 +2,11 @@ import itertools
 import logging
 import re
 
+import frozendict
+
 from mushroom import util
-from mushroom.util import regexp_command
-from mushroom.world.objects import Config
-from mushroom.world.objects import StuffBase
-from mushroom.world.objects import Thing
+from mushroom.util import ActionFailed, regexp_command
+from mushroom.world.objects import Config, StuffBase, Thing
 from mushroom.world.room import Room
 
 logger = logging.getLogger(__name__)
@@ -19,15 +19,19 @@ class Player(StuffBase):
     """
 
     fancy_name = "player"
-    fw_cmds = {
-        "look": "cmd_look",
-        "describe": "cmd_describe",
-    }
-    fw_event_handlers = {
-        "connect": "on_connect",
-        "emit": "on_emit",
-        **StuffBase.fw_event_handlers,
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "look": "cmd_look",
+            "describe": "cmd_describe",
+        }
+    )
+    fw_event_handlers = frozendict.frozendict(
+        {
+            "connect": "on_connect",
+            "emit": "on_emit",
+            **StuffBase.fw_event_handlers,
+        }
+    )
     default_description = "A non-descript citizen."
 
     def __init__(self, name):
@@ -55,6 +59,10 @@ class Player(StuffBase):
                 continue
             pows.extend(thing.powers)
         return pows
+
+    @property
+    def client(self):
+        return self._client
 
     @property
     def cmds(self):
@@ -103,7 +111,7 @@ class Player(StuffBase):
         if object.has_flag("big"):
             raise ActionFailed(f"{object.name} is too big.")
         if object is destination:
-            raise ActionFailed(f"Can not move into itself.")
+            raise ActionFailed("Can not move into itself.")
         util.moveto(object, destination)
 
     def send(self, msg):
@@ -124,7 +132,7 @@ class Player(StuffBase):
         if thing is None:
             raise ActionFailed("There is nothing to describe.")
         thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
-        caller.send("Added description of {}".format(thing.name))
+        caller.send(f"Added description of {thing.name}")
 
     def cmd_look(self, caller, query):
         """look [at] [object]: see descriptions of things, people or places."""

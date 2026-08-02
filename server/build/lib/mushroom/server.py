@@ -1,11 +1,7 @@
 import argparse
 import asyncio
-import importlib
 import logging
-import socket
 import socketserver
-import sys
-import threading
 import time
 import traceback
 from typing import Any
@@ -158,9 +154,9 @@ class ServerCommandHandler:
             cid = self.server.client_register.idmap[c]
             try:
                 self.client.send(f"{cid}\t{c.name}\t{c.handler.ip}\n")
-            except socket.error:
+            except OSError:
                 traceback.print_exc()
-                self.client.send("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
+                self.client.send(f"{cid}\t{c.name}\tSOCK_ERR\n")
         return True
 
     def scmd_save(self, rest):
@@ -172,7 +168,7 @@ class ServerCommandHandler:
         try:
             self.server.db.load(self.server.config.db_file)
             self.client.send("Database loaded\n")
-        except IOError:
+        except OSError:
             self.client.send("Could not load: database not found.\n")
         except Exception:
             self.client.send("Load failed. Check server log.\n")
@@ -241,13 +237,13 @@ class Server:
                 data = data.decode("utf8")
                 self.dirty = True
                 if self.config.debug:
-                    self.log(f"data from {client.name}: {repr(data)}")
+                    self.log(f"data from {client.name}: {data!r}")
                 if not scommand_handler.handle_input(data):
                     client.handle_input(data)
             except Exception as e:
                 traceback.print_exc()
                 if self.config.debug:
-                    client.send(f"{repr(e)}\n")
+                    client.send(f"{e!r}\n")
                     continue
                 client.send("An error occured. Please reconnect...\n")
                 break
@@ -262,7 +258,7 @@ class Server:
         try:
             self.game.load_db(self.config.db_file)
             logging.info("Database successfully loaded.")
-        except IOError:
+        except OSError:
             logging.info("Database not found, starting fresh.")
 
     def save_db(self):
@@ -318,7 +314,7 @@ async def amain():
     config = Config(**cfg_override)
 
     if config.portal_enabled:
-        logging.info(f"Starting portal server")
+        logging.info("Starting portal server")
         portal_server = PortalServer(ip=config.portal_ip, port=config.portal_port)
         await portal_server.start()
 

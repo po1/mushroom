@@ -1,15 +1,12 @@
 import argparse
 import asyncio
-import importlib
 import logging
-import socket
 import socketserver
-import sys
-import threading
 import time
 import traceback
 from typing import Any
 
+import frozendict
 import tomli
 
 from mushroom.client import Client
@@ -17,10 +14,12 @@ from mushroom.config import Config
 from mushroom.game import Game
 from mushroom.portal import Server as PortalServer
 
+logger = logging.getLogger(__name__)
+
 
 class LogFile:
     def __init__(self, log_file) -> None:
-        self.log_file = open(log_file, "a")
+        self.log_file = open(log_file, "a")  # noqa: SIM115
 
     def __call__(self, msg) -> Any:
         now = time.time()
@@ -33,9 +32,10 @@ class ClientRegister:
     some sugar added
     """
 
-    clients = []
-    idmap = {}
-    lastid = 0
+    def __init__(self):
+        self.clients = []
+        self.idmap = {}
+        self.lastid = 0
 
     def broadcast(self, msg):
         for c in self.clients:
@@ -100,16 +100,18 @@ class ClientHandler:
 
 
 class ServerCommandHandler:
-    scmds = {
-        "help": "scmd_help",
-        "login": "scmd_login",
-        "users": "scmd_users",
-        "kick": "scmd_kick",
-        "save": "scmd_save",
-        "shutdown": "scmd_shutdown",
-        "load": "scmd_load",
-    }
-    op_scmds = ["users", "kick", "save", "load", "shutdown"]
+    scmds = frozendict.frozendict(
+        {
+            "help": "scmd_help",
+            "login": "scmd_login",
+            "users": "scmd_users",
+            "kick": "scmd_kick",
+            "save": "scmd_save",
+            "shutdown": "scmd_shutdown",
+            "load": "scmd_load",
+        }
+    )
+    op_scmds = ("users", "kick", "save", "load", "shutdown")
 
     def __init__(self, server, client):
         self.server = server
@@ -146,7 +148,7 @@ class ServerCommandHandler:
         return False
 
     def scmd_shutdown(self, rest):
-        logging.info(f"Shutdown request by {self.client.name}")
+        logger.info(f"Shutdown request by {self.client.name}")
         self.client.send("Shutting down\n")
         self.server.running = False
         self.server.server.close()
@@ -158,9 +160,9 @@ class ServerCommandHandler:
             cid = self.server.client_register.idmap[c]
             try:
                 self.client.send(f"{cid}\t{c.name}\t{c.handler.ip}\n")
-            except socket.error:
+            except OSError:
                 traceback.print_exc()
-                self.client.send("{}\t{}\tSOCK_ERR\n".format(cid, c.name))
+                self.client.send(f"{cid}\t{c.name}\tSOCK_ERR\n")
         return True
 
     def scmd_save(self, rest):
@@ -172,9 +174,9 @@ class ServerCommandHandler:
         try:
             self.server.db.load(self.server.config.db_file)
             self.client.send("Database loaded\n")
-        except IOError:
+        except OSError:
             self.client.send("Could not load: database not found.\n")
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.client.send("Load failed. Check server log.\n")
             traceback.print_exc()
         return True
@@ -214,7 +216,7 @@ class Server:
         self.server = await asyncio.start_server(
             self._on_client_connect, self.config.listen_address, self.config.listen_port
         )
-        logging.info("Server started and ready to accept connections.")
+        logger.info("Server started and ready to accept connections.")
 
     def greet_client(self, client):
         try:
@@ -229,7 +231,7 @@ class Server:
         scommand_handler = ServerCommandHandler(self, client)
         self.client_register.add(client)
 
-        logging.info(f"New client: {client.name}")
+        logger.info(f"New client: {client.name}")
         self.greet_client(client)
 
         while self.running:
@@ -241,18 +243,18 @@ class Server:
                 data = data.decode("utf8")
                 self.dirty = True
                 if self.config.debug:
-                    self.log(f"data from {client.name}: {repr(data)}")
+                    self.log(f"data from {client.name}: {data!r}")
                 if not scommand_handler.handle_input(data):
                     client.handle_input(data)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 traceback.print_exc()
                 if self.config.debug:
-                    client.send(f"{repr(e)}\n")
+                    client.send(f"{e!r}\n")
                     continue
                 client.send("An error occured. Please reconnect...\n")
                 break
 
-        logging.info(f"Client disconnected: {client.name}")
+        logger.info(f"Client disconnected: {client.name}")
         client.on_disconnect()
         client.handler.shutdown()
         self.client_register.delete(client)
@@ -261,12 +263,12 @@ class Server:
     def load_db(self):
         try:
             self.game.load_db(self.config.db_file)
-            logging.info("Database successfully loaded.")
-        except IOError:
-            logging.info("Database not found, starting fresh.")
+            logger.info("Database successfully loaded.")
+        except OSError:
+            logger.info("Database not found, starting fresh.")
 
     def save_db(self):
-        logging.info("Saving database.")
+        logger.info("Saving database.")
         self.game.dump_db(self.config.db_file)
 
     async def autosave(self):
@@ -313,30 +315,30 @@ async def amain():
 
     cfg_override = {}
     if args.config is not None:
-        with open(args.config, "rb") as file:
+        with open(args.config, "rb") as file:  # noqa: ASYNC230
             cfg_override = tomli.load(file)
     config = Config(**cfg_override)
 
     if config.portal_enabled:
-        logging.info(f"Starting portal server")
+        logger.info("Starting portal server")
         portal_server = PortalServer(ip=config.portal_ip, port=config.portal_port)
         await portal_server.start()
 
-    logging.info(f"Starting server on {config.listen_address}:{config.listen_port}")
+    logger.info(f"Starting server on {config.listen_address}:{config.listen_port}")
     server = Server(config, game)
     await server.start()
 
     try:
         await server.serve_forever()
     except asyncio.CancelledError:
-        logging.info("Closing the server...")
+        logger.info("Closing the server...")
 
 
 def main():
     try:
         asyncio.run(amain())
     except KeyboardInterrupt:
-        logging.info("Got SIGINT")
+        logger.info("Got SIGINT")
 
 
 if __name__ == "__main__":

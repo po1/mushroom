@@ -7,7 +7,6 @@ from mushroom import util
 
 def compat_fw():
     # register all classes
-    from . import world
 
     # old _objects have fw.world.* classes
     import sys

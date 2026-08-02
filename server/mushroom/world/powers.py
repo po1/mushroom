@@ -1,23 +1,26 @@
-from functools import cached_property
 import re
+from functools import cached_property
+
+import frozendict
 
 from mushroom import util
-from mushroom.commands import CustomCommand
-from mushroom.commands import EventHandler
-from mushroom.commands import Lambda
-from mushroom.commands import RegexpAction
-from mushroom.commands import WrapperCommand
+from mushroom.commands import (
+    CustomCommand,
+    EventHandler,
+    Lambda,
+    RegexpAction,
+    WrapperCommand,
+)
 from mushroom.db import proxify
 from mushroom.game import Game
-from mushroom.util import ActionFailed
-from mushroom.util import regexp_command
-from mushroom.world import Room
-from mushroom.world import Thing
+from mushroom.util import ActionFailed, regexp_command
+from mushroom.world.objects import Thing
+from mushroom.world.room import Room
 
 
 class Power:
-    fw_cmds = {}
-    flags = []
+    fw_cmds = frozendict.frozendict({})
+    flags = frozenset()
 
     def __init__(self, name=None):
         self.name = name or self.__class__.__name__
@@ -42,9 +45,11 @@ class Power:
 
 
 class Examiner(Power):
-    fw_cmds = {
-        "examine": "cmd_examine",
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "examine": "cmd_examine",
+        }
+    )
 
     @regexp_command("examine", r"(#\d+|[^#].*)")
     def cmd_examine(self, caller, obj):
@@ -54,13 +59,15 @@ class Examiner(Power):
 
 
 class Tinkerer(Examiner):
-    fw_cmds = {
-        "setattr": "cmd_setattr",
-        "delattr": "cmd_delattr",
-        "setflag": "cmd_setflag",
-        "resetflag": "cmd_resetflag",
-        **Examiner.fw_cmds,
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "setattr": "cmd_setattr",
+            "delattr": "cmd_delattr",
+            "setflag": "cmd_setflag",
+            "resetflag": "cmd_resetflag",
+            **Examiner.fw_cmds,
+        }
+    )
 
     @regexp_command("setattr", r"(#\d+|\w+) ([^ ]+) (lambda:\s*)?(.*)")
     def cmd_setattr(self, caller, obj, attr, lbd, value):
@@ -100,16 +107,18 @@ class Tinkerer(Examiner):
 
 
 class Engineer(Tinkerer):
-    fw_cmds = {
-        "eval": "cmd_eval",
-        "exec": "cmd_exec",
-        "cmd": "cmd_cmd",
-        "match": "cmd_match",
-        "delcmd": "cmd_delcmd",
-        "setevent": "cmd_setevent",
-        "delevent": "cmd_delevent",
-        **Tinkerer.fw_cmds,
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "eval": "cmd_eval",
+            "exec": "cmd_exec",
+            "cmd": "cmd_cmd",
+            "match": "cmd_match",
+            "delcmd": "cmd_delcmd",
+            "setevent": "cmd_setevent",
+            "delevent": "cmd_delevent",
+            **Tinkerer.fw_cmds,
+        }
+    )
 
     def _exec_env(self, caller):
         return {
@@ -122,15 +131,15 @@ class Engineer(Tinkerer):
         """eval <string>: evaluate the string as raw code."""
         try:
             caller.send(repr(eval(rest, self._exec_env(caller))))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
 
     def cmd_exec(self, caller, rest):
         """exec <string>: execute raw code."""
         try:
-            exec(util.unescape(rest), self._exec_env(caller))
-        except Exception as e:
+            exec(util.unescape(rest), self._exec_env(caller))  # noqa: S102
+        except Exception as e:  # noqa: BLE001
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
 
@@ -181,9 +190,11 @@ class Engineer(Tinkerer):
 
 
 class Digger(Power):
-    fw_cmds = {
-        "dig": "cmd_dig",
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "dig": "cmd_dig",
+        }
+    )
 
     def cmd_dig(self, caller, query):
         """dig <room name>: make a new room."""
@@ -201,9 +212,11 @@ class Digger(Power):
 
 
 class Demolisher(Power):
-    fw_cmds = {
-        "demolish": "cmd_demolish",
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "demolish": "cmd_demolish",
+        }
+    )
 
     def cmd_demolish(self, caller, query):
         """demolish <room>: demolish a room."""
@@ -225,13 +238,15 @@ class Demolisher(Power):
 
 
 class SuperDigger(Demolisher, Digger):
-    fw_cmds = {
-        "link": "cmd_link",
-        "unlink": "cmd_unlink",
-        "teleport": "cmd_teleport",
-        **Demolisher.fw_cmds,
-        **Digger.fw_cmds,
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "link": "cmd_link",
+            "unlink": "cmd_unlink",
+            "teleport": "cmd_teleport",
+            **Demolisher.fw_cmds,
+            **Digger.fw_cmds,
+        }
+    )
 
     def cmd_link(self, caller, query):
         """link [to] <place>: open an exit towards the place."""
@@ -283,10 +298,12 @@ class SuperDigger(Demolisher, Digger):
 
 
 class Maker(Power):
-    fw_cmds = {
-        "make": "cmd_make",
-        "destroy": "cmd_destroy",
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "make": "cmd_make",
+            "destroy": "cmd_destroy",
+        }
+    )
 
     def cmd_make(self, caller, query):
         """make <thing name>: make things. Just regular things."""
@@ -309,8 +326,10 @@ class Maker(Power):
 
 
 class God(Engineer, Maker, SuperDigger):
-    fw_cmds = {
-        **Engineer.fw_cmds,
-        **Maker.fw_cmds,
-        **SuperDigger.fw_cmds,
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            **Engineer.fw_cmds,
+            **Maker.fw_cmds,
+            **SuperDigger.fw_cmds,
+        }
+    )

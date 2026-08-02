@@ -1,10 +1,8 @@
-import functools
 import queue
 import threading
 import time
 
-from mushroom.db import Database
-from mushroom.db import DbProxy
+from mushroom.db import Database, DbProxy
 
 
 class Game:
@@ -39,7 +37,7 @@ class Game:
         return cls._instance
 
     def make_player(self, name, client):
-        from mushroom.world import MRPlayer, God, Config
+        from mushroom.world import Config, God, MRPlayer
 
         player = MRPlayer(name)
 

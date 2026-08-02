@@ -1,10 +1,8 @@
-from functools import cached_property
 import logging
+from functools import cached_property
 
 from mushroom import util
-from mushroom.commands import BoundCode
-from mushroom.commands import Code
-from mushroom.commands import WrapperCommand
+from mushroom.commands import BoundCode, Code, WrapperCommand
 from mushroom.db import BaseObject
 from mushroom.game import Game
 
@@ -221,4 +219,4 @@ class Thing(StuffBase):
 
     # need this as a /dev/null sink for event handlers
     def send(self, msg):
-        logger.warn(f"{repr(self)} was sent: {msg}")
+        logger.warning(f"{self!r} was sent: {msg}")

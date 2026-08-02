@@ -2,8 +2,18 @@ import re
 
 from mushroom.util import template
 from mushroom.util.cipher import cipher, decipher
-from mushroom.util.format import format, format_object as pretty_format
+from mushroom.util.format import format
+from mushroom.util.format import format_object as pretty_format
 from mushroom.util.rwlock import RWLock
+
+__all__ = [
+    "RWLock",
+    "cipher",
+    "decipher",
+    "format",
+    "pretty_format",
+    "template",
+]
 
 
 class ActionFailed(Exception):
@@ -15,9 +25,7 @@ def match_name(short, name):
     for word in name.split():
         if short.lower() == word[: len(short)].lower():
             return True
-    if short.lower() == name[: len(short)].lower():
-        return True
-    return False
+    return short.lower() == name[: len(short)].lower()
 
 
 def match_list(short, elts):

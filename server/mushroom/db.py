@@ -7,7 +7,6 @@ from mushroom import util
 
 def compat_fw():
     # register all classes
-    from . import world
 
     # old _objects have fw.world.* classes
     import sys
@@ -42,7 +41,7 @@ class Database:
 
     def add(self, obj):
         if not isinstance(obj, BaseObject):
-            raise Exception("Trying to add random trash to the DB!")
+            raise TypeError("Trying to add random trash to the DB!")
         with self._lock.r:
             self._objects[self._next_id] = obj
             self._ids[obj] = self._next_id
@@ -85,9 +84,8 @@ class Database:
         found = []
         with self._lock.r:
             for thing in self._objects.values():
-                if util.match_name(name, thing.name):
-                    if isinstance(thing, type):
-                        found.append(thing)
+                if util.match_name(name, thing.name) and isinstance(thing, type):
+                    found.append(thing)
         return found
 
     def list_all(self, type=BaseObject):

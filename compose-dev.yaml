@@ -1,11 +1,19 @@
 services:
   mushroomd-dev:
-    image: ghcr.io/astral-sh/uv:alpine3.23
-    command: sh -c "uv venv -c && uv pip install -e . && while sleep 1; do :; done"
+    build:
+      target: dev
+    user: ${UID}:${GID}
     working_dir: /workspace
+    environment:
+      HOME: /tmp
+      DOCKER_USER: ${USER}
     volumes:
       - data:/data
-      - ./server:/workspace
+      - .:/workspace
+      - "${HOME}/.gitconfig:/home/coder/.gitconfig"
+    ports:
+      - "127.0.0.1:9000:8080"
+    command: ["--auth=none", "/workspace"]
   webproxy:
     build: ./client
     environment:
@@ -19,17 +27,5 @@ services:
       - "8000:80"
     volumes:
       - "${PWD}/client/static/index.html:/usr/share/nginx/html/index.html"
-  code:
-    image: codercom/code-server
-    volumes:
-      - "${PWD}:/home/coder/project"
-      - "${HOME}/.gitconfig:/home/coder/.gitconfig"
-    user: ${UID}:${GID}
-    environment:
-      DOCKER_USER: ${USER}
-    ports:
-      - "127.0.0.1:9000:8080"
-    command: ["--auth=none", "project"]
-
 volumes:
   data:

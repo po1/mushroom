@@ -1,10 +1,10 @@
-from functools import cached_property
 import logging
+from functools import cached_property
+
+import frozendict
 
 from mushroom import util
-from mushroom.commands import BoundCode
-from mushroom.commands import Code
-from mushroom.commands import WrapperCommand
+from mushroom.commands import BoundCode, Code, WrapperCommand
 from mushroom.db import BaseObject
 from mushroom.game import Game
 
@@ -17,8 +17,8 @@ class Object(BaseObject):
     """
 
     fancy_name = "object"
-    fw_cmds = {}
-    fw_event_handlers = {}
+    fw_cmds = frozendict.frozendict()
+    fw_event_handlers = frozendict.frozendict()
     default_description = "An abstract object."
 
     def __init__(self, name):
@@ -160,9 +160,11 @@ class StuffBase(Object):
     Stuff that can be in rooms. Things or players.
     """
 
-    fw_event_handlers = {
-        "look": "on_look",
-    }
+    fw_event_handlers = frozendict.frozendict(
+        {
+            "look": "on_look",
+        }
+    )
 
     def __init__(self, name):
         self.location = None
@@ -221,4 +223,4 @@ class Thing(StuffBase):
 
     # need this as a /dev/null sink for event handlers
     def send(self, msg):
-        logger.warn(f"{repr(self)} was sent: {msg}")
+        logger.warning(f"{self!r} was sent: {msg}")

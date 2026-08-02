@@ -2,8 +2,9 @@ import logging
 import time
 
 from mushroom import util
-from mushroom.commands import BaseCommand, ActionFailed
-from mushroom.commands import add_answer_to, YesNoAnswer
+from mushroom.commands import ActionFailed, BaseCommand, YesNoAnswer, add_answer_to
+
+logger = logging.getLogger(__name__)
 
 
 class PlayCommand(BaseCommand):
@@ -27,7 +28,7 @@ class PlayCommand(BaseCommand):
         char.play(caller, caller.game)
         caller.remove_cmd(self)
         caller.name = char.name
-        caller.send("You are now playing as {}".format(char.name))
+        caller.send(f"You are now playing as {char.name}")
         caller.handler.broadcast_others(f"{char.name} logged in.")
         caller.player.dispatch("connect")
 
@@ -53,7 +54,7 @@ class PlayCommand(BaseCommand):
 
 class HelpCommand(BaseCommand):
     name = "help"
-    help_text = "syntax: help <command>\n" "Displays help topics for the given command."
+    help_text = "syntax: help <command>\nDisplays help topics for the given command."
 
     def run(self, caller, query):
         caller = getattr(caller, "_client", caller)
@@ -66,7 +67,7 @@ class HelpCommand(BaseCommand):
         cmd_name = query.split()[0]
         matchs = [x for x in commands if cmd_name.lower() == x.name[: len(cmd_name)]]
         if not matchs:
-            caller.send("Command {} was not found".format(cmd_name))
+            caller.send(f"Command {cmd_name} was not found")
             return
         if len(matchs) > 1:
             caller.send("Multiple commands were found:")
@@ -74,10 +75,10 @@ class HelpCommand(BaseCommand):
 
 
 class Client:
-    fw_cmds = [
+    fw_cmds = (
         HelpCommand,
         PlayCommand,
-    ]
+    )
 
     def __init__(self, handler, name, game):
         self.handler = handler
@@ -101,8 +102,8 @@ class Client:
     def send(self, msg):
         try:
             self.handler.send(msg + "\n")
-        except IOError:
-            logging.error(f"Could not send to {self.name}")
+        except OSError:
+            logger.error(f"Could not send to {self.name}")
 
     def broadcast(self, msg):
         self.handler.broadcast(f"{msg}")

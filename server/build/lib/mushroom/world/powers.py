@@ -1,18 +1,18 @@
-from functools import cached_property
 import re
+from functools import cached_property
 
 from mushroom import util
-from mushroom.commands import CustomCommand
-from mushroom.commands import EventHandler
-from mushroom.commands import Lambda
-from mushroom.commands import RegexpAction
-from mushroom.commands import WrapperCommand
+from mushroom.commands import (
+    CustomCommand,
+    EventHandler,
+    Lambda,
+    RegexpAction,
+    WrapperCommand,
+)
 from mushroom.db import proxify
 from mushroom.game import Game
-from mushroom.util import ActionFailed
-from mushroom.util import regexp_command
-from mushroom.world import Room
-from mushroom.world import Thing
+from mushroom.util import ActionFailed, regexp_command
+from mushroom.world import Room, Thing
 
 
 class Power:
@@ -122,15 +122,15 @@ class Engineer(Tinkerer):
         """eval <string>: evaluate the string as raw code."""
         try:
             caller.send(repr(eval(rest, self._exec_env(caller))))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
 
     def cmd_exec(self, caller, rest):
         """exec <string>: execute raw code."""
         try:
-            exec(util.unescape(rest), self._exec_env(caller))
-        except Exception as e:
+            exec(util.unescape(rest), self._exec_env(caller))  # noqa: S102
+        except Exception as e:  # noqa: BLE001
             cls = e.__class__.__name__
             caller.send(f"{cls}: {e}")
 

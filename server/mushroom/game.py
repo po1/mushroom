@@ -1,10 +1,12 @@
-import functools
+import bisect
+import logging
 import queue
 import threading
 import time
 
-from mushroom.db import Database
-from mushroom.db import DbProxy
+from mushroom.db import Database, DbProxy
+
+logger = logging.getLogger(__name__)
 
 
 class Game:
@@ -39,7 +41,8 @@ class Game:
         return cls._instance
 
     def make_player(self, name, client):
-        from mushroom.world import MRPlayer, God, Config
+        from mushroom import util
+        from mushroom.world import Config, God, MRPlayer
 
         player = MRPlayer(name)
 
@@ -92,7 +95,7 @@ class Game:
             try:
                 event()  # self-dispatching events are tight
             except Exception as e:
-                logging.warning(
+                logger.warning(
                     "exception in event callback: %s", repr(event), exc_info=e
                 )
 

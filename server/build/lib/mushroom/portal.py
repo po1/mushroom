@@ -249,7 +249,7 @@ class Handler:
                     # it's all json
                     msg = json.loads(message)
                 except ValueError:
-                    logger.warn(f"failed to decode message: {message}")
+                    logger.warning(f"failed to decode message: {message}")
                     continue
                 await self.handle(msg)
         finally:
@@ -281,7 +281,7 @@ class Handler:
         if self.portal is not None:
             self.portal.error(msg)
         else:
-            logger.warn("Got a portal error before hello: %s", msg)
+            logger.warning("Got a portal error before hello: %s", msg)
 
     async def handle_player_input(self, msg):
         await self.portal.remote_input(msg["player_id"], msg["text"])

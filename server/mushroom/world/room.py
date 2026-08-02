@@ -1,5 +1,7 @@
 import re
 
+import frozendict
+
 from mushroom import util
 from mushroom.util import ActionFailed
 from mushroom.world.objects import Object
@@ -13,16 +15,20 @@ class Room(Object):
     """
 
     fancy_name = "room"
-    fw_cmds = {
-        "say": "cmd_say",
-        "emit": "cmd_emit",
-        "take": "cmd_take",
-        "drop": "cmd_drop",
-        "go": "cmd_go",
-    }
-    fw_event_handlers = {
-        "look": "on_look",
-    }
+    fw_cmds = frozendict.frozendict(
+        {
+            "say": "cmd_say",
+            "emit": "cmd_emit",
+            "take": "cmd_take",
+            "drop": "cmd_drop",
+            "go": "cmd_go",
+        }
+    )
+    fw_event_handlers = frozendict.frozendict(
+        {
+            "look": "on_look",
+        }
+    )
     default_description = "A blank room."
 
     def __init__(self, name):

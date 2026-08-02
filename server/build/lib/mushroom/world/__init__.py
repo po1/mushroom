@@ -1,14 +1,12 @@
-from mushroom.world.objects import Config
-from mushroom.world.objects import Object
-from mushroom.world.objects import Thing
+from mushroom.world import powers
+from mushroom.world.objects import Config, Object, Thing
 from mushroom.world.player import Player
 from mushroom.world.room import Room
-from mushroom.world import powers
 
 __all__ = [
     "Config",
     "Object",
-    "Player" "Room",
+    "PlayerRoom",
     "Thing",
     "powers",
 ]

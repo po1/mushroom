@@ -3,10 +3,8 @@ import logging
 import re
 
 from mushroom import util
-from mushroom.util import regexp_command
-from mushroom.world.objects import Config
-from mushroom.world.objects import StuffBase
-from mushroom.world.objects import Thing
+from mushroom.util import ActionFailed, regexp_command
+from mushroom.world.objects import Config, StuffBase, Thing
 from mushroom.world.room import Room
 
 logger = logging.getLogger(__name__)
@@ -103,7 +101,7 @@ class Player(StuffBase):
         if object.has_flag("big"):
             raise ActionFailed(f"{object.name} is too big.")
         if object is destination:
-            raise ActionFailed(f"Can not move into itself.")
+            raise ActionFailed("Can not move into itself.")
         util.moveto(object, destination)
 
     def send(self, msg):
@@ -124,7 +122,7 @@ class Player(StuffBase):
         if thing is None:
             raise ActionFailed("There is nothing to describe.")
         thing.description = description.replace("\\n", "\n").replace("\\t", "\t")
-        caller.send("Added description of {}".format(thing.name))
+        caller.send(f"Added description of {thing.name}")
 
     def cmd_look(self, caller, query):
         """look [at] [object]: see descriptions of things, people or places."""

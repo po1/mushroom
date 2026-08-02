@@ -4,7 +4,7 @@ from mushroom.util import template
 
 
 def color(fg, bg=None):
-    bg = f";{bg+10}" if bg else ""
+    bg = f";{bg + 10}" if bg else ""
     return f"\033[{fg}{bg}m"
 
 
@@ -54,7 +54,7 @@ def _pf(obj, indent=2, width=80, newl=False):
         return newl + "\n".join(f"{ind}{_val(k)}" for k in obj)
     if isinstance(obj, dict):
         ind = " " * indent
-        newl = f"\n" if newl else ""
+        newl = "\n" if newl else ""
         keycolor = color(random.randint(31, 36))
 
         def _keyval(k, v):

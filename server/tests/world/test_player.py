@@ -1,6 +1,5 @@
 from mushroom.game import Game
-from mushroom.world import Player
-from mushroom.world import Room
+from mushroom.world import Player, Room
 
 
 class FakeClient:

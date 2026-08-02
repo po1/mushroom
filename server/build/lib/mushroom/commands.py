@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import logging
 import re
 import types
@@ -25,7 +24,7 @@ def code_env(caller, owner=None, **kwargs):
 def exec_code(code, caller, owner=None, **kwargs):
     try:
         exec(code, code_env(caller, owner=owner, **kwargs))
-    except ActionFailed as e:
+    except ActionFailed:
         raise
     except Exception as e:
         caller.send(f"exec error: ({e.__class__.__name__}) {e}")
@@ -34,7 +33,7 @@ def exec_code(code, caller, owner=None, **kwargs):
 def eval_code(code, caller, owner=None, **kwargs):
     try:
         return eval(code, code_env(caller, owner=owner, **kwargs))
-    except ActionFailed as e:
+    except ActionFailed:
         raise
     except Exception as e:
         caller.send(f"eval error: ({e.__class__.__name__}) {e}")
@@ -110,9 +109,7 @@ class RegexpAction(Action, Code):
 
     def __repr__(self) -> str:
         txt = escape(self.code)
-        return (
-            f"<match {self.name}[{self.flags}]: {repr(self.regexp.pattern)} -> {txt}>"
-        )
+        return f"<match {self.name}[{self.flags}]: {self.regexp.pattern!r} -> {txt}>"
 
     def match(self, caller, query):
         if (m := self.regexp.match(query)) is not None:
@@ -203,7 +200,7 @@ class YesNoAnswer(Answer):
         answers = [(x, yes_action) for x in yes_answers] + [
             (x, no_action) for x in no_answers
         ]
-        super(YesNoAnswer, self).__init__(answers)
+        super().__init__(answers)
 
 
 def add_answer_to(answer, target):
