@@ -1,5 +1,5 @@
 MUSHRoom
--- 0.3 "cep"
+-- 0.4 "deershield"
 
 MUSHRoom is a tool to create and host a MUSH.
 You will need python3 to launch the server.
