@@ -4,7 +4,7 @@ from functools import cached_property
 import frozendict
 
 from mushroom import util
-from mushroom.commands import BoundCode, Code, WrapperCommand
+from mushroom.commands import BoundCode, Code, Lambda, WrapperCommand
 from mushroom.db import BaseObject
 from mushroom.game import Game
 
@@ -90,6 +90,7 @@ class Object(BaseObject):
     def __setstate__(self, odict):
         self.__dict__.update(odict)
         self._add_missing_fields()
+        self._bind_all_lambdas()
 
     def clone(self):
         obj = self.__class__(self.name)
@@ -120,6 +121,11 @@ class Object(BaseObject):
         for d in dummy.__dict__:
             if d not in self.__dict__:
                 setattr(self, d, getattr(dummy, d))
+
+    def _bind_all_lambdas(self):
+        for k, v in self.__dict__.items():
+            if isinstance(v, Lambda):
+                setattr(self, k, v.bind(self))
 
     @property
     def id(self):
