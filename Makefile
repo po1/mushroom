@@ -3,20 +3,28 @@ GID := $(shell id -g)
 export UID GID
 
 .PHONY: images
-images: server-image client-image			## Build all images
+images: server-image webproxy-image			## Build all images
 
 .PHONY: server-image
 server-image:								## Build the server image
 	$(MAKE) -C server image
 
-.PHONY: client-image
-client-image:								## Build the server image
-	$(MAKE) -C client image
+.PHONY: webproxy-image
+webproxy-image:								## Build the webproxy image
+	$(MAKE) -C webproxy image
 
 .PHONY: dev
-dev:            ## Launch a dev container. Just type 'mushroomd' in it.
-	docker compose -f compose-dev.yaml up -d \
-		&& docker exec -it mushroom-mushroomd-dev-1 uv run sh
+dev: dev-up            ## Launch a dev container. Just type 'mushroomd' in it.
+	docker exec -it mushroom-mushroomd-dev-1 sh -c "cd server && uv run bash"
+
+.PHONY: dev-up
+dev-up:   									## Start the dev stack
+	docker compose -f compose-dev.yaml up -d
+
+.PHONY: dev-down
+dev-down:   								## Stop the dev stack
+	docker compose -f compose-dev.yaml down
+
 
 .PHONY: help
 help:           ## Show this help

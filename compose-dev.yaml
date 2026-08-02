@@ -15,7 +15,7 @@ services:
       - "127.0.0.1:9000:8080"
     command: ["--auth=none", "/workspace"]
   webproxy:
-    build: ./client
+    build: ./webproxy
     environment:
       MUSHROOMD_HOST: "mushroomd-dev"
       MUSHROOMD_PORT: "1337"
@@ -26,6 +26,6 @@ services:
     ports:
       - "8000:80"
     volumes:
-      - "${PWD}/client/static/index.html:/usr/share/nginx/html/index.html"
+      - "${PWD}/webproxy/client/index.html:/usr/share/nginx/html/index.html"
 volumes:
   data:

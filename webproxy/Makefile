@@ -1,5 +1,5 @@
 version = $(shell git describe --tags --always --dirty)
-image-name = pol/mushroom-client:$(version)
+image-name = pol/mushroom-webproxy:$(version)
 
 .PHONY: image
 image:			## Build the mushroom server image
