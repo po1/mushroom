@@ -2,10 +2,21 @@ UID := $(shell id -u)
 GID := $(shell id -g)
 export UID GID
 
+.PHONY: images
+images server-image client-image:			## Build all images
+
+.PHONY: server-image
+server-image:								## Build the server image
+	$(MAKE) -C server image
+
+.PHONY: client-image
+client-image:								## Build the server image
+	$(MAKE) -C client image
+
 .PHONY: dev
 dev:            ## Launch a dev container. Just type 'mushroomd' in it.
 	docker compose -f compose-dev.yaml up -d \
-		&& docker exec -it --user "$(UID):$(GID)" mushroom-mushroomd-dev-1 sh
+		&& docker exec -it mushroom-mushroomd-dev-1 uv run sh
 
 .PHONY: help
 help:           ## Show this help

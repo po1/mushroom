@@ -3,7 +3,7 @@ import functools
 import lark
 
 grammar = """
-SP: /\s+/
+SP: /\\s+/
 IF: "if"i
 ELSE: "else"i
 ENDIF: "endif"i

@@ -1,6 +1,6 @@
 services:
   mushroomd:
-    build: .
+    build: ./server
     volumes:
       - data:/data
   webproxy:

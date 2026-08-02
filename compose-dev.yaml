@@ -1,11 +1,11 @@
 services:
   mushroomd-dev:
-    image: python:3.9.19-alpine
-    command: sh -c "pip install -e . && while sleep 1000; do :; done"
+    image: ghcr.io/astral-sh/uv:alpine3.23
+    command: sh -c "uv venv -c && uv pip install -e . && while sleep 1; do :; done"
     working_dir: /workspace
     volumes:
       - data:/data
-      - .:/workspace
+      - ./server:/workspace
   webproxy:
     build: ./client
     environment:
