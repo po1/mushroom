@@ -3,7 +3,7 @@ GID := $(shell id -g)
 export UID GID
 
 .PHONY: images
-images server-image client-image:			## Build all images
+images: server-image client-image			## Build all images
 
 .PHONY: server-image
 server-image:								## Build the server image

@@ -5,4 +5,4 @@ WORKDIR /workspace
 
 RUN npm install .
 
-CMD node index.js
+CMD ["node", "index.js"]
