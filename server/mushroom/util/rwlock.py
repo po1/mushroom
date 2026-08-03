@@ -65,4 +65,4 @@ class RWLock:
             if self.writers and self.readers == 0:
                 self.w_cv.notify()
             elif self.writers == 0:
-                self.r_cv.notifyAll()
+                self.r_cv.notify_all()
