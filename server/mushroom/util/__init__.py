@@ -149,3 +149,6 @@ class Updatable:
 
 def is_player(obj):
     return getattr(obj, "fancy_name", None) == "player"
+
+def is_room(obj):
+    return getattr(obj, "fancy_name", None) == "room"
