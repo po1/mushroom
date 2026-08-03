@@ -2,7 +2,7 @@ import pytest
 
 from mushroom.client import Client
 from mushroom.game import Game
-from mushroom.world import Player, Room
+from mushroom.world import Player, Room, Thing
 
 
 class FakeClient(Client):
@@ -42,3 +42,11 @@ def player(client, game, room):
     client.player = theplayer
     game.db.add(theplayer)
     return theplayer
+
+
+@pytest.fixture
+def thing(game, room):
+    thething = Thing("bobo")
+    thething.location = room
+    game.db.add(thething)
+    return thething

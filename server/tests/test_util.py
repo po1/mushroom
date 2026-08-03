@@ -7,3 +7,7 @@ def test_is_player(player):
 
 def test_is_room(room):
     assert util.is_room(room) is True
+
+
+def test_is_thing(thing):
+    assert util.is_thing(thing) is True

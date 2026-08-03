@@ -152,3 +152,6 @@ def is_player(obj):
 
 def is_room(obj):
     return getattr(obj, "fancy_name", None) == "room"
+
+def is_thing(obj):
+    return getattr(obj, "fancy_name", None) == "thing"
