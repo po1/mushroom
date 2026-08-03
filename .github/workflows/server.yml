@@ -36,4 +36,9 @@ jobs:
     - name: Lint with ruff
       run: uv run ruff check
     - name: Test with pytest
-      run: uv run python -m pytest
+      run: uv run python -m pytest --junitxml=test-results.xml
+    - name: Output test result summary
+      uses: test-summary/action@v2
+      with:
+        paths: "test-results.xml"
+      if: always()
