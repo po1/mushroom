@@ -40,5 +40,5 @@ jobs:
     - name: Output test result summary
       uses: test-summary/action@v2
       with:
-        paths: "test-results.xml"
+        paths: "server/test-results.xml"
       if: always()
