@@ -1,6 +1,7 @@
 name: Server lint & tests
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "master" ]
     paths:
@@ -16,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: sserver
+        working-directory: server
     strategy:
       fail-fast: false
       matrix:
