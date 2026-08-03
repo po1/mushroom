@@ -6,10 +6,12 @@ on:
     branches: [ "master" ]
     paths:
       - server/**
+      - .github/workflows/server.yml
   pull_request:
     branches: [ "master" ]
     paths:
       - server/**
+      - .github/workflows/server.yml
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
