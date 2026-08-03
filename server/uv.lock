@@ -40,7 +40,7 @@ wheels = [
 
 [[package]]
 name = "mushroom"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "frozendict" },
     { name = "lark" },

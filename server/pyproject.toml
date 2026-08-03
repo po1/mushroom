@@ -23,4 +23,5 @@ dev = [
     "ruff>=0.16.1",
 ]
 
-[tool.ruff.lint]
+[tool.uv]
+package = true
