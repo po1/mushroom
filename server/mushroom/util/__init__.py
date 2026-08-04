@@ -22,6 +22,9 @@ class ActionFailed(Exception):
 
 def match_name(short, name):
     # allow matching individual words of the name
+    words = set(name.lower().split())
+    if words.issuperset(set(short.lower().split())):
+        return True
     for word in name.split():
         if short.lower() == word[: len(short)].lower():
             return True
@@ -150,8 +153,10 @@ class Updatable:
 def is_player(obj):
     return getattr(obj, "fancy_name", None) == "player"
 
+
 def is_room(obj):
     return getattr(obj, "fancy_name", None) == "room"
+
 
 def is_thing(obj):
     return getattr(obj, "fancy_name", None) == "thing"

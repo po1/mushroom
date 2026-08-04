@@ -39,7 +39,9 @@ class PlayCommand(BaseCommand):
 
         matchs = util.match_list(query, caller.game.get_players())
         if not matchs:
-            caller.send(f"Couldn't find a character named {query}.\nCreate it?")
+            caller.send(
+                f"Couldn't find a character named {query}.\nCreate it? (yes/no)"
+            )
             caller.remove_cmd(self)
             add_answer_to(
                 YesNoAnswer(
